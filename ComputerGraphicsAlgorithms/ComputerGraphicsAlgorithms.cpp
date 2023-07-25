@@ -3,6 +3,7 @@
 
 #include "framework.h"
 #include "ComputerGraphicsAlgorithms.h"
+#include "Renderer.h"
 
 #define MAX_LOADSTRING 100
 
@@ -15,44 +16,56 @@ WCHAR szWindowClass[MAX_LOADSTRING];            // the main window class name
 ATOM                MyRegisterClass(HINSTANCE hInstance);
 BOOL                InitInstance(HINSTANCE, int);
 LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
-INT_PTR CALLBACK    About(HWND, UINT, WPARAM, LPARAM);
 
-int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
-                     _In_opt_ HINSTANCE hPrevInstance,
-                     _In_ LPWSTR    lpCmdLine,
-                     _In_ int       nCmdShow)
-{
-    UNREFERENCED_PARAMETER(hPrevInstance);
-    UNREFERENCED_PARAMETER(lpCmdLine);
+LONG                WindowWidth = 1280;
+LONG                WindowHeight = 720;
 
-    // TODO: Place code here.
+Renderer* pRenderer = nullptr;
 
-    // Initialize global strings
-    LoadStringW(hInstance, IDS_APP_TITLE, szTitle, MAX_LOADSTRING);
-    LoadStringW(hInstance, IDC_COMPUTERGRAPHICSALGORITHMS, szWindowClass, MAX_LOADSTRING);
-    MyRegisterClass(hInstance);
+int APIENTRY wWinMain(
+	_In_ HINSTANCE hInstance,
+	_In_opt_ HINSTANCE hPrevInstance,
+	_In_ LPWSTR    lpCmdLine,
+	_In_ int       nCmdShow
+) {
+	UNREFERENCED_PARAMETER(hPrevInstance);
+	UNREFERENCED_PARAMETER(lpCmdLine);
 
-    // Perform application initialization:
-    if (!InitInstance (hInstance, nCmdShow))
-    {
-        return FALSE;
-    }
+	// TODO: Place code here.
 
-    HACCEL hAccelTable = LoadAccelerators(hInstance, MAKEINTRESOURCE(IDC_COMPUTERGRAPHICSALGORITHMS));
+	// Initialize global strings
+	LoadStringW(hInstance, IDS_APP_TITLE, szTitle, MAX_LOADSTRING);
+	LoadStringW(hInstance, IDC_COMPUTERGRAPHICSALGORITHMS, szWindowClass, MAX_LOADSTRING);
+	MyRegisterClass(hInstance);
 
-    MSG msg;
+	// Perform application initialization:
+	if (!InitInstance(hInstance, nCmdShow)) {
+		return FALSE;
+	}
 
-    // Main message loop:
-    while (GetMessage(&msg, nullptr, 0, 0))
-    {
-        if (!TranslateAccelerator(msg.hwnd, hAccelTable, &msg))
-        {
-            TranslateMessage(&msg);
-            DispatchMessage(&msg);
-        }
-    }
+	HACCEL hAccelTable{ LoadAccelerators(hInstance, MAKEINTRESOURCE(IDC_COMPUTERGRAPHICSALGORITHMS)) };
 
-    return (int) msg.wParam;
+	MSG msg;
+
+	// Main message loop:
+	for (bool exit{}; !exit;) {
+		if (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
+			if (!TranslateAccelerator(msg.hwnd, hAccelTable, &msg)) {
+				TranslateMessage(&msg);
+				DispatchMessage(&msg);
+			}
+			if (msg.message == WM_QUIT) {
+				exit = true;
+			}
+		}
+		OutputDebugString(_T("Render\n"));
+		pRenderer->Render();
+	}
+
+	pRenderer->Term();
+	delete pRenderer;
+
+	return static_cast<int>(msg.wParam);
 }
 
 
@@ -62,25 +75,23 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 //
 //  PURPOSE: Registers the window class.
 //
-ATOM MyRegisterClass(HINSTANCE hInstance)
-{
-    WNDCLASSEXW wcex;
+ATOM MyRegisterClass(HINSTANCE hInstance) {
+	WNDCLASSEXW wcex{
+		.cbSize{ sizeof(WNDCLASSEX) },
+		.style{ CS_HREDRAW | CS_VREDRAW },
+		.lpfnWndProc{ WndProc },
+		.cbClsExtra{},
+		.cbWndExtra{},
+		.hInstance{ hInstance },
+		.hIcon{ LoadIcon(hInstance, MAKEINTRESOURCE(IDI_COMPUTERGRAPHICSALGORITHMS)) },
+		.hCursor{ LoadCursor(nullptr, IDC_ARROW) },
+		.hbrBackground{ nullptr },
+		.lpszMenuName{},
+		.lpszClassName{ szWindowClass },
+		.hIconSm{ LoadIcon(wcex.hInstance, MAKEINTRESOURCE(IDI_SMALL)) }
+	};
 
-    wcex.cbSize = sizeof(WNDCLASSEX);
-
-    wcex.style          = CS_HREDRAW | CS_VREDRAW;
-    wcex.lpfnWndProc    = WndProc;
-    wcex.cbClsExtra     = 0;
-    wcex.cbWndExtra     = 0;
-    wcex.hInstance      = hInstance;
-    wcex.hIcon          = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_COMPUTERGRAPHICSALGORITHMS));
-    wcex.hCursor        = LoadCursor(nullptr, IDC_ARROW);
-    wcex.hbrBackground  = (HBRUSH)(COLOR_WINDOW+1);
-    wcex.lpszMenuName   = MAKEINTRESOURCEW(IDC_COMPUTERGRAPHICSALGORITHMS);
-    wcex.lpszClassName  = szWindowClass;
-    wcex.hIconSm        = LoadIcon(wcex.hInstance, MAKEINTRESOURCE(IDI_SMALL));
-
-    return RegisterClassExW(&wcex);
+	return RegisterClassExW(&wcex);
 }
 
 //
@@ -93,88 +104,74 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
 //        In this function, we save the instance handle in a global variable and
 //        create and display the main program window.
 //
-BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
-{
-   hInst = hInstance; // Store instance handle in our global variable
+BOOL InitInstance(HINSTANCE hInstance, int nCmdShow) {
+	hInst = hInstance; // Store instance handle in our global variable
 
-   HWND hWnd = CreateWindowW(szWindowClass, szTitle, WS_OVERLAPPEDWINDOW,
-      CW_USEDEFAULT, 0, CW_USEDEFAULT, 0, nullptr, nullptr, hInstance, nullptr);
+	HWND hWnd{ CreateWindowW(
+			szWindowClass,
+			szTitle,
+			WS_OVERLAPPEDWINDOW,
+			CW_USEDEFAULT,
+			0,
+			CW_USEDEFAULT,
+			0,
+			nullptr,
+			nullptr,
+			hInstance,
+			nullptr
+	) };
 
-   if (!hWnd)
-   {
-      return FALSE;
-   }
+	if (!hWnd) {
+		return FALSE;
+	}
 
-   ShowWindow(hWnd, nCmdShow);
-   UpdateWindow(hWnd);
+	pRenderer = new Renderer();
+	if (!pRenderer->Init(hWnd)) {
+		delete pRenderer;
+		return FALSE;
+	}
 
-   return TRUE;
+	ShowWindow(hWnd, nCmdShow);
+	UpdateWindow(hWnd);
+
+	// Adjust window size
+	RECT rc{
+		.left{},
+		.top{},
+		.right{ WindowWidth },
+		.bottom{ WindowHeight }
+	};
+
+	AdjustWindowRect(&rc, WS_OVERLAPPEDWINDOW, TRUE);
+
+	MoveWindow(hWnd, 100, 100, rc.right - rc.left, rc.bottom - rc.top, TRUE);
+
+	return TRUE;
 }
 
 //
 //  FUNCTION: WndProc(HWND, UINT, WPARAM, LPARAM)
 //
 //  PURPOSE: Processes messages for the main window.
-//
-//  WM_COMMAND  - process the application menu
-//  WM_PAINT    - Paint the main window
+// 
+//  WM_SIZE     - Resize window
 //  WM_DESTROY  - post a quit message and return
 //
 //
-LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
-{
-    switch (message)
-    {
-    case WM_COMMAND:
-        {
-            int wmId = LOWORD(wParam);
-            // Parse the menu selections:
-            switch (wmId)
-            {
-            case IDM_ABOUT:
-                DialogBox(hInst, MAKEINTRESOURCE(IDD_ABOUTBOX), hWnd, About);
-                break;
-            case IDM_EXIT:
-                DestroyWindow(hWnd);
-                break;
-            default:
-                return DefWindowProc(hWnd, message, wParam, lParam);
-            }
-        }
-        break;
-    case WM_PAINT:
-        {
-            PAINTSTRUCT ps;
-            HDC hdc = BeginPaint(hWnd, &ps);
-            // TODO: Add any drawing code that uses hdc here...
-            EndPaint(hWnd, &ps);
-        }
-        break;
-    case WM_DESTROY:
-        PostQuitMessage(0);
-        break;
-    default:
-        return DefWindowProc(hWnd, message, wParam, lParam);
-    }
-    return 0;
-}
-
-// Message handler for about box.
-INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
-{
-    UNREFERENCED_PARAMETER(lParam);
-    switch (message)
-    {
-    case WM_INITDIALOG:
-        return (INT_PTR)TRUE;
-
-    case WM_COMMAND:
-        if (LOWORD(wParam) == IDOK || LOWORD(wParam) == IDCANCEL)
-        {
-            EndDialog(hDlg, LOWORD(wParam));
-            return (INT_PTR)TRUE;
-        }
-        break;
-    }
-    return (INT_PTR)FALSE;
+LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
+	switch (message) {
+		case WM_SIZE:
+			if (pRenderer != nullptr) {
+				RECT rc;
+				GetClientRect(hWnd, &rc);
+				pRenderer->Resize(rc.right - rc.left, rc.bottom - rc.top);
+			}
+			break;
+		case WM_DESTROY:
+			PostQuitMessage(0);
+			break;
+		default:
+			return DefWindowProc(hWnd, message, wParam, lParam);
+	}
+	return 0;
 }
