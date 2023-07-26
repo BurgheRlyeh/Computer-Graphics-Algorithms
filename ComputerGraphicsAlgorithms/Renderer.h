@@ -1,12 +1,30 @@
 #pragma once
 
-#pragma comment(lib,"dxgi.lib")
-#pragma comment(lib,"d3d11.lib")
-
 #include <dxgi.h>
 #include <d3d11.h>
 
 class Renderer {
+    ID3D11Device* device;
+    ID3D11DeviceContext* deviceContext;
+
+    IDXGISwapChain* swapChain;
+    ID3D11RenderTargetView* backBufferRTV;
+
+    ID3D11Buffer* vertexBuffer;
+    ID3D11Buffer* indexBuffer;
+
+    ID3D11VertexShader* vertexShader;
+    ID3D11PixelShader* pixelShader;
+    ID3D11InputLayout* inputLayout;
+
+    UINT width;
+    UINT height;
+
+    typedef struct Vertex {
+        float x, y, z;
+        COLORREF color;
+    } Vertex;
+
 public:
     Renderer():
         device{},
@@ -14,26 +32,28 @@ public:
         swapChain{},
         backBufferRTV{},
         width{ 16 },
-        height{ 16 } {}
+        height{ 16 },
+        vertexBuffer{},
+        indexBuffer{},
+        vertexShader{},
+        pixelShader{},
+        inputLayout{} {};
 
-    bool Init(HWND hWnd);
-    void Term();
+    bool init(HWND hWnd);
+    void term();
 
-    bool Render();
-    bool Resize(UINT width, UINT height);
+    bool render();
+    bool resize(UINT width, UINT height);
 
 private:
     IDXGIAdapter* selectIDXGIAdapter(IDXGIFactory* factory);
     HRESULT createDeviceAndSwapChain(HWND hWnd, IDXGIAdapter* adapter);
-    HRESULT SetupBackBuffer();
 
-private:
-    ID3D11Device* device;
-    ID3D11DeviceContext* deviceContext;
+    HRESULT setupBackBuffer();
 
-    IDXGISwapChain* swapChain;
-    ID3D11RenderTargetView* backBufferRTV;
+    HRESULT initScene();
+    HRESULT createVertexBuffer(Vertex (&vertices)[], UINT numVertices);
+    HRESULT createIndexBuffer(USHORT (&indices)[], UINT numIndices);
 
-    UINT width;
-    UINT height;
+    HRESULT compileAndCreateShader(const std::wstring& path, ID3D11DeviceChild** ppShader, ID3DBlob** ppCode = nullptr);
 };

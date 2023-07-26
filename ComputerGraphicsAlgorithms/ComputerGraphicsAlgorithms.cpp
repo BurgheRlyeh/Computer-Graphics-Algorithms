@@ -17,10 +17,10 @@ ATOM                MyRegisterClass(HINSTANCE hInstance);
 BOOL                InitInstance(HINSTANCE, int);
 LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
 
-LONG                WindowWidth = 1280;
-LONG                WindowHeight = 720;
+LONG                WindowWidth{ 1280 };
+LONG                WindowHeight{ 720 };
 
-Renderer* pRenderer = nullptr;
+Renderer* pRenderer{};
 
 int APIENTRY wWinMain(
 	_In_ HINSTANCE hInstance,
@@ -37,6 +37,17 @@ int APIENTRY wWinMain(
 	LoadStringW(hInstance, IDS_APP_TITLE, szTitle, MAX_LOADSTRING);
 	LoadStringW(hInstance, IDC_COMPUTERGRAPHICSALGORITHMS, szWindowClass, MAX_LOADSTRING);
 	MyRegisterClass(hInstance);
+
+	// Fix working folder
+	std::wstring dir;
+	dir.resize(MAX_PATH + 1);
+	GetCurrentDirectory(MAX_PATH + 1, &dir[0]);
+	size_t configPos{ dir.find(L"x64") };
+	if (configPos != std::wstring::npos) {
+		dir.resize(configPos);
+		dir += szTitle;
+		SetCurrentDirectory(dir.c_str());
+	}
 
 	// Perform application initialization:
 	if (!InitInstance(hInstance, nCmdShow)) {
@@ -59,10 +70,22 @@ int APIENTRY wWinMain(
 			}
 		}
 		OutputDebugString(_T("Render\n"));
-		pRenderer->Render();
+		pRenderer->render();
+	}
+	for (bool exit{}; !exit;) {
+		if (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE)) {
+			if (!TranslateAccelerator(msg.hwnd, hAccelTable, &msg)) {
+				TranslateMessage(&msg);
+				DispatchMessage(&msg);
+			}
+			if (msg.message == WM_QUIT) {
+				exit = true;
+			}
+		}
+		// render
 	}
 
-	pRenderer->Term();
+	pRenderer->term();
 	delete pRenderer;
 
 	return static_cast<int>(msg.wParam);
@@ -126,7 +149,7 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow) {
 	}
 
 	pRenderer = new Renderer();
-	if (!pRenderer->Init(hWnd)) {
+	if (!pRenderer->init(hWnd)) {
 		delete pRenderer;
 		return FALSE;
 	}
@@ -164,7 +187,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) 
 			if (pRenderer != nullptr) {
 				RECT rc;
 				GetClientRect(hWnd, &rc);
-				pRenderer->Resize(rc.right - rc.left, rc.bottom - rc.top);
+				pRenderer->resize(rc.right - rc.left, rc.bottom - rc.top);
 			}
 			break;
 		case WM_DESTROY:
@@ -174,4 +197,59 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) 
 			return DefWindowProc(hWnd, message, wParam, lParam);
 	}
 	return 0;
+}
+
+HRESULT Renderer::createDeviceAndSwapChain(HWND hWnd, IDXGIAdapter* adapter) {
+	assert(hWnd);
+	assert(adapter);
+
+	D3D_FEATURE_LEVEL level, levels[]{ D3D_FEATURE_LEVEL_11_0 };
+
+	UINT flags{};
+#ifdef _DEBUG
+	flags |= D3D11_CREATE_DEVICE_DEBUG;
+#endif
+
+	DXGI_SWAP_CHAIN_DESC swapChainDesc{
+		.BufferDesc{
+			.Width{ width },	// ?????? 
+			.Height{ height },	// ??????
+			.RefreshRate{	// ??????? ??????????, 0 = inf
+				.Numerator{},
+				.Denominator{ 1 }
+			},
+			.Format{ DXGI_FORMAT_R8G8B8A8_UNORM },	// ?????? ???????
+			.ScanlineOrdering{ DXGI_MODE_SCANLINE_ORDER_UNSPECIFIED }, // ??????? ????????? ?? ?????
+			.Scaling{ DXGI_MODE_SCALING_UNSPECIFIED } // ???????????????
+		},
+		.SampleDesc{	// MSAA
+			.Count{ 1 },
+			.Quality{}
+		},
+		.BufferUsage{ DXGI_USAGE_RENDER_TARGET_OUTPUT },	// ?????????? ????????????? ??????? (read/write)
+		.BufferCount{ 2 },	// ?????????? ???????? ??? ?????????
+		.OutputWindow{ hWnd },	// ????
+		.Windowed{ true },	// ???????? ?????
+		.SwapEffect{ DXGI_SWAP_EFFECT_DISCARD }, // ???????? ????? ??????? (??????????? ??????? ?????????? ??? ???)
+		.Flags{}	// ??????
+	};
+
+	HRESULT hr{ D3D11CreateDeviceAndSwapChain(
+		adapter,					// GPU
+		D3D_DRIVER_TYPE_UNKNOWN,	// ??? ???????? - Software ??????????, ????????, ??? ????????????, ?? ?????? ?? ??????? GPU
+		nullptr,					// ?????????? dll software ?????????? ?????????????
+		flags,						// ????????? ?????
+		levels,						// ??????? DirectX
+		1,							// ?? ??
+		D3D11_SDK_VERSION,			// ?????? SDK
+		&swapChainDesc,
+		&swapChain,
+		&device,
+		&level,
+		&deviceContext
+	) };
+
+	assert(level == D3D_FEATURE_LEVEL_11_0);
+
+	return hr;
 }
