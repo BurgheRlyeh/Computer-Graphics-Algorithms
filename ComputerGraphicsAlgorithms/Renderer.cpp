@@ -197,7 +197,7 @@ HRESULT Renderer::initScene() {
 	Vertex vertices[]{
 		{ 0.0f,  0.5f, 0.0f, RGB(255, 0, 0) },
 		{ -0.5f, -0.5f, 0.0f, RGB(0, 255, 0) },
-		{ 0.5f, -0.5f, 0.0f, RGB(0, 0, 255) },
+		{ 0.5f, -0.5f, 0.0f, RGB(0, 0, 255) }
 	};
 
 	hr = createVertexBuffer(vertices, sizeof(vertices) / sizeof(*vertices));
