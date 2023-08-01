@@ -20,7 +20,9 @@ LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
 LONG                WindowWidth{ 1280 };
 LONG                WindowHeight{ 720 };
 
-Renderer* pRenderer{};
+Renderer* renderer{};
+
+bool PressedKeys[0xff]{};
 
 int APIENTRY wWinMain(
 	_In_ HINSTANCE hInstance,
@@ -69,12 +71,14 @@ int APIENTRY wWinMain(
 				exit = true;
 			}
 		}
-		OutputDebugString(_T("Render\n"));
-		pRenderer->render();
+		//OutputDebugString(_T("Render\n"));
+		if (renderer->update()) {
+			renderer->render();
+		}
 	}
 
-	pRenderer->term();
-	delete pRenderer;
+	renderer->term();
+	delete renderer;
 
 	return static_cast<int>(msg.wParam);
 }
@@ -136,9 +140,9 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow) {
 		return FALSE;
 	}
 
-	pRenderer = new Renderer();
-	if (!pRenderer->init(hWnd)) {
-		delete pRenderer;
+	renderer = new Renderer();
+	if (!renderer->init(hWnd)) {
+		delete renderer;
 		return FALSE;
 	}
 
@@ -170,17 +174,49 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow) {
 //
 //
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
+	if (message == WM_DESTROY) {
+		PostQuitMessage(0);
+		return 0;
+	}
+
+	if (!renderer) {
+		return DefWindowProc(hWnd, message, wParam, lParam);
+	}
+
 	switch (message) {
-		case WM_SIZE:
-			if (pRenderer != nullptr) {
-				RECT rc;
-				GetClientRect(hWnd, &rc);
-				pRenderer->resize(rc.right - rc.left, rc.bottom - rc.top);
+		case WM_SIZE: 
+			RECT rc;
+			GetClientRect(hWnd, &rc);
+			renderer->resize(rc.right - rc.left, rc.bottom - rc.top);
+			break;
+
+		case WM_RBUTTONDOWN:
+			renderer->mouseRBPressed(true, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
+			break;
+
+		case WM_RBUTTONUP:
+			renderer->mouseRBPressed(false, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
+			break;
+
+		case WM_MOUSEMOVE:
+			renderer->mouseMoved(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
+			break;
+
+		case WM_MOUSEWHEEL:
+			renderer->mouseWheel(GET_WHEEL_DELTA_WPARAM(wParam));
+			break;
+
+		case WM_KEYDOWN:
+			if (!PressedKeys[wParam]) {
+				renderer->keyPressed((int)wParam);
+				PressedKeys[wParam] = true;
 			}
 			break;
-		case WM_DESTROY:
-			PostQuitMessage(0);
+
+		case WM_KEYUP:
+			PressedKeys[wParam] = false;
 			break;
+
 		default:
 			return DefWindowProc(hWnd, message, wParam, lParam);
 	}

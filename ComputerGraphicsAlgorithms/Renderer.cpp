@@ -1,8 +1,9 @@
 ﻿#include "framework.h"
-
 #include "Renderer.h"
 
-#include <d3dcompiler.h>
+#include <chrono>
+
+#define NOMINMAX
 
 bool Renderer::init(HWND hWnd) {
 	// Create a DirectX graphics interface factory.
@@ -26,6 +27,17 @@ bool Renderer::init(HWND hWnd) {
 	}
 
 	hr = initScene();
+	if (FAILED(hr)) {
+		return false;
+	}
+
+	// initial camera setup
+	camera = Camera{
+		.poi{ DirectX::XMFLOAT3(0, 0, 0) },
+		.r{ 5.0f },
+		.angZ{ -DirectX::XM_PI / 3 },
+		.angY{ - DirectX::XM_PI / 8 },
+	};
 
 	SAFE_RELEASE(adapter);
 	SAFE_RELEASE(factory);
@@ -117,6 +129,94 @@ void Renderer::term() {
 	SAFE_RELEASE(device);
 }
 
+bool Renderer::update() {
+	size_t usec{ static_cast<size_t>(std::chrono::duration_cast<std::chrono::microseconds>(
+		std::chrono::steady_clock::now().time_since_epoch()
+	).count()) };
+
+	if (!prevUSec) {
+		prevUSec = usec;
+	}
+
+	if (isModelRotate) {
+		angle += modelRotationSpeed * (usec - prevUSec) / 1e6; 	// обновление угла вращения
+
+		ModelBuffer geometryBuffer{
+			// матрица вращения вокруг оси
+			DirectX::XMMatrixRotationAxis(
+				// вектор, описывающий ось вращения
+				DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 1.0f),
+				static_cast<float>(angle)
+			) 
+		};
+
+		// обновление буфера
+		deviceContext->UpdateSubresource(this->modelBuffer, 0, nullptr, &geometryBuffer, 0, 0);
+	}
+
+	prevUSec = usec;
+
+	// Setup camera
+	DirectX::XMMATRIX v{
+		// создание матрицы для системы координат левой руки
+		DirectX::XMMatrixLookAtLH(
+			// позиция камеры
+			DirectX::XMVectorSet(
+				camera.poi.x + camera.r * cosf(camera.angY) * cosf(camera.angZ),
+				camera.poi.y + camera.r * sinf(camera.angY),
+				camera.poi.z + camera.r * cosf(camera.angY) * sinf(camera.angZ),
+				0.0f
+			),
+			// позиция точки фокуса
+			DirectX::XMVectorSet(
+				camera.poi.x,
+				camera.poi.y,
+				camera.poi.z,
+				0.0f
+			),
+			// направление вверх от камеры
+			DirectX::XMVectorSet(
+				cosf(camera.angY + DirectX::XM_PIDIV2) * cosf(camera.angZ),
+				sinf(camera.angY + DirectX::XM_PIDIV2),
+				cosf(camera.angY + DirectX::XM_PIDIV2) * sinf(camera.angZ),
+				0.0f
+			)
+		)
+	};
+
+	float nearPlane{ 0.1f };
+	float farPlane{ 100.0f };
+	float fov{ DirectX::XM_PI / 3 };
+	float aspectRatio{ static_cast<float>(height) / width };
+
+	DirectX::XMMATRIX p{
+		// Матрица построения перспективы для левой руки
+		DirectX::XMMatrixPerspectiveLH(
+			2 * nearPlane * tanf(fov / 2),					// Ширина усеченного конуса в nearPlane
+			2 * nearPlane * tanf(fov / 2) * aspectRatio,	// Высота усеченного конуса в nearPlane
+			nearPlane,										// Расстояние до ближайшей плоскости отсечения
+			farPlane										// Расстояние до дальней плоскости отсечения
+		)
+	};
+
+	D3D11_MAPPED_SUBRESOURCE subresource;
+	HRESULT hr = deviceContext->Map(
+		viewProjectionBuffer, // указатель на ресурс
+		0, // номер
+		D3D11_MAP_WRITE_DISCARD, // не сохраняем предыдущее значение
+		0, &subresource
+	);
+	if (FAILED(hr)) {
+		return false;
+	}
+
+	ViewProjectionBuffer& sceneBuffer = *reinterpret_cast<ViewProjectionBuffer*>(subresource.pData);
+	sceneBuffer.vp = DirectX::XMMatrixMultiply(v, p);
+	deviceContext->Unmap(this->viewProjectionBuffer, 0);
+
+	return SUCCEEDED(hr);
+}
+
 bool Renderer::render() {
 	deviceContext->ClearState();
 
@@ -144,17 +244,20 @@ bool Renderer::render() {
 	};
 	deviceContext->RSSetScissorRects(1, &rect);
 
+	deviceContext->RSSetState(rasterizerState);
+
 	deviceContext->IASetIndexBuffer(indexBuffer, DXGI_FORMAT_R16_UINT, 0);
 	ID3D11Buffer* vertexBuffers[]{ vertexBuffer };
 	UINT strides[]{ 16 };
 	UINT offsets[]{ 0 };
+	ID3D11Buffer* cbuffers[]{ viewProjectionBuffer, modelBuffer };
 	deviceContext->IASetVertexBuffers(0, 1, vertexBuffers, strides, offsets);
 	deviceContext->IASetInputLayout(inputLayout);
 	deviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	deviceContext->VSSetShader(vertexShader, nullptr, 0);
+	deviceContext->VSSetConstantBuffers(0, 2, cbuffers);
 	deviceContext->PSSetShader(pixelShader, nullptr, 0);
 	deviceContext->DrawIndexed(3, 0, 0);
-
 
 	return SUCCEEDED(swapChain->Present(0, 0));
 }
@@ -168,13 +271,47 @@ bool Renderer::resize(UINT width, UINT height) {
 
 	HRESULT hr{ swapChain->ResizeBuffers(2, width, height, DXGI_FORMAT_R8G8B8A8_UNORM, 0) };
 	if (FAILED(hr)) {
-		return hr;
+		return false;
 	}
 
 	this->width = width;
 	this->height = height;
 
 	return SUCCEEDED(setupBackBuffer());
+}
+
+void Renderer::mouseRBPressed(bool isPressed, int x, int y) {
+	isMRBPressed = isPressed;
+	if (!isMRBPressed) {
+		return;
+	}
+
+	prevMouseX = x;
+	prevMouseY = y;
+}
+
+void Renderer::mouseMoved(int x, int y) {
+	if (!isMRBPressed) {
+		return;
+	}
+
+	camera.angZ += (float)(x - prevMouseX) / width * cameraRotationSpeed;
+	camera.angY += (float)(y - prevMouseY) / width * cameraRotationSpeed;
+	camera.angY = DirectX::XMMax(camera.angY, -modelRotationSpeed);
+	camera.angY = DirectX::XMMin(camera.angY, modelRotationSpeed);
+
+	prevMouseX = x;
+	prevMouseY = y;
+}
+
+void Renderer::mouseWheel(int delta) {
+	camera.r = DirectX::XMMax(camera.r - delta / 100.0f, 1.0f);
+}
+
+void Renderer::keyPressed(int keyCode) {
+	if (keyCode == ' ') {
+		isModelRotate = !isModelRotate;
+	}
 }
 
 HRESULT Renderer::setupBackBuffer() {
@@ -193,111 +330,203 @@ HRESULT Renderer::setupBackBuffer() {
 HRESULT Renderer::initScene() {
 	HRESULT hr{ S_OK };
 
-	// Create vertex buffer
-	Vertex vertices[]{
-		{ 0.0f,  0.5f, 0.0f, RGB(255, 0, 0) },
-		{ -0.5f, -0.5f, 0.0f, RGB(0, 255, 0) },
-		{ 0.5f, -0.5f, 0.0f, RGB(0, 0, 255) }
-	};
+	// create vertex buffer
+	{
+		Vertex vertices[]{
+			{ { 0.0f,  0.5f, 0.0f }, RGB(255, 0, 0) },
+			{ { -0.5f, -0.5f, 0.0f }, RGB(0, 255, 0) },
+			{ { 0.5f, -0.5f, 0.0f }, RGB(0, 0, 255) }
+		};
 
-	hr = createVertexBuffer(vertices, sizeof(vertices) / sizeof(*vertices));
-	if (FAILED(hr)) {
-		return hr;
+		hr = createVertexBuffer(vertices, sizeof(vertices) / sizeof(*vertices));
+		if (FAILED(hr)) {
+			return hr;
+		}
+
+		hr = SetResourceName(vertexBuffer, "VertexBuffer");
+		if (FAILED(hr)) {
+			return hr;
+		}
 	}
 
-	// naming for debug layer
-	hr = SetResourceName(vertexBuffer, "VertexBuffer");
-	if (FAILED(hr)) {
-		return hr;
-	}
+	// create index buffer
+	{
+		USHORT indices[]{
+			0, 2, 1
+		};
 
-	// Create index buffer
-	USHORT indices[]{
-		0, 2, 1
-	};
+		hr = createIndexBuffer(indices, sizeof(indices) / sizeof(*indices));
+		if (FAILED(hr)) {
+			return hr;
+		}
 
-	hr = createIndexBuffer(indices, sizeof(indices) / sizeof(*indices));
-	if (FAILED(hr)) {
-		return hr;
-	}
-
-	hr = SetResourceName(vertexBuffer, "IndexBuffer");
-	if (FAILED(hr)) {
-		return hr;
+		hr = SetResourceName(indexBuffer, "IndexBuffer");
+		if (FAILED(hr)) {
+			return hr;
+		}
 	}
 
 	// shaders processing
 	ID3DBlob* vertexShaderCode{};
+	{
+		hr = compileAndCreateShader(L"VertexShader.vs", (ID3D11DeviceChild**)&vertexShader, &vertexShaderCode);
+		if (FAILED(hr)) {
+			return hr;
+		}
 
-	hr = compileAndCreateShader(L"VertexShader.vs", (ID3D11DeviceChild**)&vertexShader, &vertexShaderCode);
-	if (FAILED(hr)) {
-		return hr;
-	}
-
-	hr = compileAndCreateShader(L"PixelShader.ps", (ID3D11DeviceChild**)&pixelShader);
-	if (FAILED(hr)) {
-		return hr;
+		hr = compileAndCreateShader(L"PixelShader.ps", (ID3D11DeviceChild**)&pixelShader);
+		if (FAILED(hr)) {
+			return hr;
+		}
 	}
 
 	// create input layout
-	D3D11_INPUT_ELEMENT_DESC InputDesc[]{
-		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-		{ "COLOR", 0, DXGI_FORMAT_R8G8B8A8_UNORM, 0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0 }
-	};
-	hr = device->CreateInputLayout(
-		InputDesc,
-		2,
-		vertexShaderCode->GetBufferPointer(),
-		vertexShaderCode->GetBufferSize(),
-		&inputLayout
-	);
-	if (FAILED(hr)) {
-		return hr;
+	{
+		D3D11_INPUT_ELEMENT_DESC InputDesc[]{
+			{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+			{ "COLOR", 0, DXGI_FORMAT_R8G8B8A8_UNORM, 0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0 }
+		};
+
+		hr = device->CreateInputLayout(
+			InputDesc,
+			2,
+			vertexShaderCode->GetBufferPointer(),
+			vertexShaderCode->GetBufferSize(),
+			&inputLayout
+		);
+		if (FAILED(hr)) {
+			return hr;
+		}
+
+		hr = SetResourceName(inputLayout, "InputLayout");
+		if (FAILED(hr)) {
+			return hr;
+		}
+	}
+	SAFE_RELEASE(vertexShaderCode);
+
+	// create model buffer
+	{
+		ModelBuffer modelBuffer{ DirectX::XMMatrixIdentity() };
+
+		hr = createModelBuffer(modelBuffer);
+		if (FAILED(hr)) {
+			return hr;
+		}
+
+		hr = SetResourceName(this->modelBuffer, "GeomBuffer");
+		if (FAILED(hr)) {
+			return hr;
+		}
 	}
 
-	hr = SetResourceName(inputLayout, "InputLayout");
+	// create view-projection buffer
+	{
+		hr = createViewProjectionBuffer();
+		if (FAILED(hr)) { 
+			return hr;
+		}
 
-	SAFE_RELEASE(vertexShaderCode);
+		hr = SetResourceName(viewProjectionBuffer, "SceneBuffer");
+		if (FAILED(hr)) {
+			return hr;
+		}
+	}
+
+	// No culling rasterizer state
+	{
+		hr = createRasterizerState();
+		if (FAILED(hr)) {
+			return hr;
+		}
+
+		hr = SetResourceName(rasterizerState, "RasterizerState");
+		if (FAILED(hr)) {
+			return hr;
+		}
+	}
 
 	return hr;
 }
 
-HRESULT Renderer::createVertexBuffer(Vertex (&vertices)[], UINT numVertices) {
+void Renderer::termScene() {
+	SAFE_RELEASE(rasterizerState);
+
+	SAFE_RELEASE(inputLayout);
+	SAFE_RELEASE(pixelShader);
+	SAFE_RELEASE(vertexBuffer);
+
+	SAFE_RELEASE(indexBuffer);
+	SAFE_RELEASE(vertexBuffer);
+
+	SAFE_RELEASE(viewProjectionBuffer);
+	SAFE_RELEASE(modelBuffer);
+}
+
+HRESULT Renderer::createVertexBuffer(Vertex(&vertices)[], UINT numVertices) {
 	D3D11_BUFFER_DESC desc{
-		.ByteWidth{ sizeof(Vertex) * numVertices },		// размер
-		.Usage{ D3D11_USAGE_IMMUTABLE },	// способ использования (не меняем)
-		.BindFlags{ D3D11_BIND_VERTEX_BUFFER },	// что хранит
-		.CPUAccessFlags{},	// способ взаимодействия с CPU (must be mutable)
-		.MiscFlags{},	// способ взимодействия между разными GPU
-		.StructureByteStride{}	// еще всякое
+		.ByteWidth{ sizeof(Vertex)* numVertices },
+		.Usage{ D3D11_USAGE_IMMUTABLE },
+		.BindFlags{ D3D11_BIND_VERTEX_BUFFER }
 	};
 
 	D3D11_SUBRESOURCE_DATA data{
-		.pSysMem{ vertices },	// исходные данные
-		.SysMemPitch{ sizeof(Vertex) * numVertices },	// размер (структура также используется для текстур - тогда выравлнивание строк)
-		.SysMemSlicePitch{}	// выравнивание текстур (массив или 3d)
+		.pSysMem{ vertices },
+		.SysMemPitch{ sizeof(Vertex)* numVertices }
 	};
 
 	return device->CreateBuffer(&desc, &data, &vertexBuffer);
 }
 
-HRESULT Renderer::createIndexBuffer(USHORT (&indices)[], UINT numIndices) {
+HRESULT Renderer::createIndexBuffer(USHORT(&indices)[], UINT numIndices) {
 	D3D11_BUFFER_DESC desc{
-		.ByteWidth{ sizeof(USHORT) * numIndices },
+		.ByteWidth{ sizeof(USHORT)* numIndices },
 		.Usage{ D3D11_USAGE_IMMUTABLE },
-		.BindFlags{ D3D11_BIND_INDEX_BUFFER },
-		.CPUAccessFlags{},
-		.MiscFlags{},
-		.StructureByteStride{}
+		.BindFlags{ D3D11_BIND_INDEX_BUFFER }
 	};
 
 	D3D11_SUBRESOURCE_DATA data{
 		.pSysMem{ indices },
-		.SysMemPitch{ sizeof(USHORT)* numIndices },
-		.SysMemSlicePitch{}
+		.SysMemPitch{ sizeof(USHORT)* numIndices }
 	};
 
 	return device->CreateBuffer(&desc, &data, &indexBuffer);
+}
+
+HRESULT Renderer::createModelBuffer(ModelBuffer& modelBuffer) {
+	D3D11_BUFFER_DESC desc{
+		.ByteWidth{ sizeof(ModelBuffer) },
+		.Usage{ D3D11_USAGE_DEFAULT },				// храним в VRAM, изменяем
+		.BindFlags{ D3D11_BIND_CONSTANT_BUFFER }	// константный
+	};
+
+	D3D11_SUBRESOURCE_DATA data{
+		.pSysMem{ &modelBuffer },
+		.SysMemPitch{ sizeof(modelBuffer) }
+	};
+
+	return device->CreateBuffer(&desc, &data, &this->modelBuffer);
+}
+
+HRESULT Renderer::createViewProjectionBuffer() {
+	D3D11_BUFFER_DESC desc{
+		.ByteWidth{ sizeof(ViewProjectionBuffer) },
+		.Usage{ D3D11_USAGE_DYNAMIC },	// часто собираемся обновлять, храним ближе к CPU
+		.BindFlags{ D3D11_BIND_CONSTANT_BUFFER },
+		.CPUAccessFlags{ D3D11_CPU_ACCESS_WRITE }	// можем писать со стороны CPU  
+	};
+
+	return device->CreateBuffer(&desc, nullptr, &viewProjectionBuffer);
+}
+
+HRESULT Renderer::createRasterizerState() {
+	D3D11_RASTERIZER_DESC desc{
+		.FillMode{ D3D11_FILL_SOLID },
+		.CullMode{ D3D11_CULL_NONE },	// draw all sides
+		.DepthClipEnable{ TRUE }
+	};
+
+	return device->CreateRasterizerState(&desc, &rasterizerState);
 }
 
 HRESULT Renderer::compileAndCreateShader(const std::wstring& path, ID3D11DeviceChild** ppShader, ID3DBlob** ppCode) {
