@@ -35,8 +35,8 @@ bool Renderer::init(HWND hWnd) {
 	camera = Camera{
 		.poi{ DirectX::XMFLOAT3(0, 0, 0) },
 		.r{ 5.0f },
-		.angZ{ -DirectX::XM_PI / 3 },
-		.angY{ - DirectX::XM_PI / 8 },
+		.angZ{ - DirectX::XM_PI / 2 },
+		.angY{ DirectX::XM_PI / 4 },
 	};
 
 	SAFE_RELEASE(adapter);
@@ -244,7 +244,7 @@ bool Renderer::render() {
 	};
 	deviceContext->RSSetScissorRects(1, &rect);
 
-	deviceContext->RSSetState(rasterizerState);
+	//deviceContext->RSSetState(rasterizerState);
 
 	deviceContext->IASetIndexBuffer(indexBuffer, DXGI_FORMAT_R16_UINT, 0);
 	ID3D11Buffer* vertexBuffers[]{ vertexBuffer };
@@ -257,7 +257,7 @@ bool Renderer::render() {
 	deviceContext->VSSetShader(vertexShader, nullptr, 0);
 	deviceContext->VSSetConstantBuffers(0, 2, cbuffers);
 	deviceContext->PSSetShader(pixelShader, nullptr, 0);
-	deviceContext->DrawIndexed(3, 0, 0);
+	deviceContext->DrawIndexed(36, 0, 0);
 
 	return SUCCEEDED(swapChain->Present(0, 0));
 }
@@ -332,10 +332,17 @@ HRESULT Renderer::initScene() {
 
 	// create vertex buffer
 	{
-		Vertex vertices[]{
-			{ { 0.0f,  0.5f, 0.0f }, RGB(255, 0, 0) },
-			{ { -0.5f, -0.5f, 0.0f }, RGB(0, 255, 0) },
-			{ { 0.5f, -0.5f, 0.0f }, RGB(0, 0, 255) }
+		Vertex vertices[24]{
+			// Bottom
+			{ { -0.5, -0.5,  0.5 }, RGB(0, 0, 0) },
+			{ {  0.5, -0.5,  0.5 }, RGB(0, 0, 255) },
+			{ {  0.5, -0.5, -0.5 }, RGB(0, 255, 0) },
+			{ { -0.5, -0.5, -0.5 }, RGB(0, 255, 255) },
+			// Top
+			{ { -0.5,  0.5, -0.5 }, RGB(255, 0, 0) },
+			{ {  0.5,  0.5, -0.5 }, RGB(255, 0, 255) },
+			{ {  0.5,  0.5,  0.5 }, RGB(255, 255, 0) },
+			{ { -0.5,  0.5,  0.5 }, RGB(255, 255, 255) }
 		};
 
 		hr = createVertexBuffer(vertices, sizeof(vertices) / sizeof(*vertices));
@@ -351,8 +358,13 @@ HRESULT Renderer::initScene() {
 
 	// create index buffer
 	{
-		USHORT indices[]{
-			0, 2, 1
+		USHORT indices[36]{
+			0, 2, 1, 0, 1, 7,
+			0, 3, 2, 0, 4, 3,
+			0, 7, 4, 1, 2, 6,
+			1, 6, 7, 2, 3, 5,
+			2, 5, 6, 3, 4, 5,
+			4, 6, 5, 4, 7, 6
 		};
 
 		hr = createIndexBuffer(indices, sizeof(indices) / sizeof(*indices));
