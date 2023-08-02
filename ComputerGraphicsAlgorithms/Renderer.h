@@ -5,12 +5,16 @@
 #include <d3dcompiler.h>
 #include <DirectXMath.h>
 
+#include <chrono>
+
+#include "Texture.h"
+
 #define _MATH_DEFINES_DEFINED
 
 class Renderer {
     typedef struct Vertex {
         DirectX::XMFLOAT3 point;
-        COLORREF color;
+        DirectX::XMFLOAT2 texture;
     } Vertex;
 
     typedef struct ModelBuffer {
@@ -48,6 +52,10 @@ class Renderer {
     ID3D11InputLayout* inputLayout{};
 
     ID3D11RasterizerState* rasterizerState{};
+
+    ID3D11Texture2D* texture{};
+    ID3D11ShaderResourceView* textureView{};
+    ID3D11SamplerState* sampler{};
 
     UINT width{ 16 };
     UINT height{ 16 };

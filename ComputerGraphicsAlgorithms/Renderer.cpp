@@ -1,7 +1,6 @@
 ﻿#include "framework.h"
 #include "Renderer.h"
-
-#include <chrono>
+#include "Texture.h"
 
 #define NOMINMAX
 
@@ -246,9 +245,15 @@ bool Renderer::render() {
 
 	//deviceContext->RSSetState(rasterizerState);
 
+	ID3D11SamplerState* samplers[]{ sampler };
+	deviceContext->PSSetSamplers(0, 1, samplers);
+
+	ID3D11ShaderResourceView* resources[]{ textureView };
+	deviceContext->PSSetShaderResources(0, 1, resources);
+
 	deviceContext->IASetIndexBuffer(indexBuffer, DXGI_FORMAT_R16_UINT, 0);
 	ID3D11Buffer* vertexBuffers[]{ vertexBuffer };
-	UINT strides[]{ 16 };
+	UINT strides[]{ 20 };
 	UINT offsets[]{ 0 };
 	ID3D11Buffer* cbuffers[]{ viewProjectionBuffer, modelBuffer };
 	deviceContext->IASetVertexBuffers(0, 1, vertexBuffers, strides, offsets);
@@ -295,7 +300,7 @@ void Renderer::mouseMoved(int x, int y) {
 		return;
 	}
 
-	camera.angZ += (float)(x - prevMouseX) / width * cameraRotationSpeed;
+	camera.angZ += - (float)(x - prevMouseX) / width * cameraRotationSpeed;
 	camera.angY += (float)(y - prevMouseY) / width * cameraRotationSpeed;
 	camera.angY = DirectX::XMMax(camera.angY, -modelRotationSpeed);
 	camera.angY = DirectX::XMMin(camera.angY, modelRotationSpeed);
@@ -333,16 +338,36 @@ HRESULT Renderer::initScene() {
 	// create vertex buffer
 	{
 		Vertex vertices[24]{
-			// Bottom
-			{ { -0.5, -0.5,  0.5 }, RGB(0, 0, 0) },
-			{ {  0.5, -0.5,  0.5 }, RGB(0, 0, 255) },
-			{ {  0.5, -0.5, -0.5 }, RGB(0, 255, 0) },
-			{ { -0.5, -0.5, -0.5 }, RGB(0, 255, 255) },
-			// Top
-			{ { -0.5,  0.5, -0.5 }, RGB(255, 0, 0) },
-			{ {  0.5,  0.5, -0.5 }, RGB(255, 0, 255) },
-			{ {  0.5,  0.5,  0.5 }, RGB(255, 255, 0) },
-			{ { -0.5,  0.5,  0.5 }, RGB(255, 255, 255) }
+			// Bottom face
+			{ { -0.5, -0.5,  0.5 }, { 0, 1 }},
+			{ {  0.5, -0.5,  0.5 }, { 1, 1 }},
+			{ {  0.5, -0.5, -0.5 }, { 1, 0 }},
+			{ { -0.5, -0.5, -0.5 }, { 0, 0 }},
+			// Front face
+			{ { -0.5,  0.5, -0.5 }, { 0, 1 }},
+			{ {  0.5,  0.5, -0.5 }, { 1, 1 }},
+			{ {  0.5,  0.5,  0.5 }, { 1, 0 }},
+			{ { -0.5,  0.5,  0.5 }, { 0, 0 }},
+			// Top face
+			{ {  0.5, -0.5, -0.5 }, { 0, 1 }},
+			{ {  0.5, -0.5,  0.5 }, { 1, 1 }},
+			{ {  0.5,  0.5,  0.5 }, { 1, 0 }},
+			{ {  0.5,  0.5, -0.5 }, { 0, 0 }},
+			// Back face
+			{ { -0.5, -0.5,  0.5 }, { 0, 1 }},
+			{ { -0.5, -0.5, -0.5 }, { 1, 1 }},
+			{ { -0.5,  0.5, -0.5 }, { 1, 0 }},
+			{ { -0.5,  0.5,  0.5 }, { 0, 0 }},
+			// Right face
+			{ {  0.5, -0.5,  0.5 }, { 0, 1 }},
+			{ { -0.5, -0.5,  0.5 }, { 1, 1 }},
+			{ { -0.5,  0.5,  0.5 }, { 1, 0 }},
+			{ {  0.5,  0.5,  0.5 }, { 0, 0 }},
+			// Left face
+			{ { -0.5, -0.5, -0.5 }, { 0, 1 }},
+			{ {  0.5, -0.5, -0.5 }, { 1, 1 }},
+			{ {  0.5,  0.5, -0.5 }, { 1, 0 }},
+			{ { -0.5,  0.5, -0.5 }, { 0, 0 }}
 		};
 
 		hr = createVertexBuffer(vertices, sizeof(vertices) / sizeof(*vertices));
@@ -358,13 +383,13 @@ HRESULT Renderer::initScene() {
 
 	// create index buffer
 	{
-		USHORT indices[36]{
-			0, 2, 1, 0, 1, 7,
-			0, 3, 2, 0, 4, 3,
-			0, 7, 4, 1, 2, 6,
-			1, 6, 7, 2, 3, 5,
-			2, 5, 6, 3, 4, 5,
-			4, 6, 5, 4, 7, 6
+		UINT16 indices[36]{
+			 0,	 2,  1,  0,  3,  2,
+			 4,	 6,  5,  4,  7,  6,
+			 8,	10,  9,  8, 11, 10,
+			12, 14, 13, 12, 15, 14,
+			16, 18, 17, 16, 19, 18,
+			20, 22, 21, 20, 23, 22
 		};
 
 		hr = createIndexBuffer(indices, sizeof(indices) / sizeof(*indices));
@@ -396,7 +421,7 @@ HRESULT Renderer::initScene() {
 	{
 		D3D11_INPUT_ELEMENT_DESC InputDesc[]{
 			{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-			{ "COLOR", 0, DXGI_FORMAT_R8G8B8A8_UNORM, 0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0 }
+			{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0 }
 		};
 
 		hr = device->CreateInputLayout(
@@ -458,6 +483,100 @@ HRESULT Renderer::initScene() {
 		}
 	}
 
+	// load texture
+	TextureDesc textureDesc{};
+	{
+		const std::wstring textureName{ L"../Common/Kitty.dds" };
+
+		bool ddsRes{ LoadDDS(textureName.c_str(), textureDesc) };
+
+		DXGI_FORMAT textureFmt{ textureDesc.fmt };
+
+		D3D11_TEXTURE2D_DESC desc{
+			// размеры в текселях
+			textureDesc.width, textureDesc.height,
+			textureDesc.mipmapsCount, 1,
+			textureDesc.fmt, { 1, 0 },
+			D3D11_USAGE_IMMUTABLE,
+			D3D11_BIND_SHADER_RESOURCE
+		};
+
+		// размеры текстуры в блоках
+		UINT32 blockWidth{ static_cast<UINT32>(std::ceil(desc.Width / 4)) };
+		UINT32 blockHeight{ static_cast<UINT32>(std::ceil(desc.Height / 4)) };
+
+		// размер строки пикселей в байтах
+		UINT32 pitch{ blockWidth * GetBytesPerBlock(desc.Format) };
+		const char* src{ reinterpret_cast<const char*>(textureDesc.pData) };
+
+		// расчет mip уровней
+		std::vector<D3D11_SUBRESOURCE_DATA> data;
+		data.resize(desc.MipLevels);
+		for (UINT32 i{}; i < desc.MipLevels; ++i) {
+			data[i].pSysMem = src;
+			data[i].SysMemPitch = pitch;
+			data[i].SysMemSlicePitch = 0;
+
+			src += pitch * blockHeight;
+			blockHeight = (std::max)(1u, blockHeight / 2);
+			blockWidth = (std::max)(1u, blockWidth / 2);
+			pitch = blockWidth * GetBytesPerBlock(desc.Format);
+		}
+		
+		// создание текстуры
+		hr = device->CreateTexture2D(&desc, data.data(), &texture);
+		if (FAILED(hr)) {
+			return hr;
+		}
+
+		hr = SetResourceName(texture, WCSToMBS(textureName));
+		if (FAILED(hr)) {
+			return hr;
+		}
+	}
+
+	// create view
+	{
+		// resource view для обработки в шейдерах
+		D3D11_SHADER_RESOURCE_VIEW_DESC desc{
+			.Format{ textureDesc.fmt },
+			.ViewDimension{ D3D11_SRV_DIMENSION_TEXTURE2D },
+			.Texture2D{
+				.MostDetailedMip{},
+				.MipLevels{ textureDesc.mipmapsCount }
+			}
+		};
+
+		hr = device->CreateShaderResourceView(texture, &desc, &textureView);
+	}
+	free(textureDesc.pData);
+
+	// create sampler
+	{
+		D3D11_SAMPLER_DESC desc{
+			// метод фильтрации
+			.Filter{ D3D11_FILTER_ANISOTROPIC },
+			// методы обработки координат за границами
+			// WRAP - повторение текстуры
+			.AddressU{ D3D11_TEXTURE_ADDRESS_WRAP },
+			.AddressV{ D3D11_TEXTURE_ADDRESS_WRAP },
+			.AddressW{ D3D11_TEXTURE_ADDRESS_WRAP },
+			.MipLODBias{}, // смещение уровня mipmap
+			.MaxAnisotropy{ 16 }, // настройка аниз фильтр
+			.ComparisonFunc{ D3D11_COMPARISON_NEVER },
+			// цвет для ADDRESS_BORDER
+			.BorderColor{ 1.0f, 1.0f, 1.0f, 1.0f },
+			// диапазон mipmap
+			.MinLOD{ -FLT_MAX },
+			.MaxLOD{ FLT_MAX }
+		};
+
+		hr = device->CreateSamplerState(&desc, &sampler);
+		if (FAILED(hr)) {
+			return hr;
+		}
+	}
+
 	return hr;
 }
 
@@ -484,7 +603,7 @@ HRESULT Renderer::createVertexBuffer(Vertex(&vertices)[], UINT numVertices) {
 
 	D3D11_SUBRESOURCE_DATA data{
 		.pSysMem{ vertices },
-		.SysMemPitch{ sizeof(Vertex)* numVertices }
+		.SysMemPitch{ sizeof(Vertex) * numVertices }
 	};
 
 	return device->CreateBuffer(&desc, &data, &vertexBuffer);
