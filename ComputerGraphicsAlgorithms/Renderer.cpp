@@ -2,12 +2,43 @@
 #include "Renderer.h"
 #include "Texture.h"
 
-#define NOMINMAX
+void Renderer::Camera::getDirections(DirectX::XMFLOAT3& forward, DirectX::XMFLOAT3& right) {
+	DirectX::XMFLOAT3 dir{
+		cosf(angY) * cosf(angZ),
+		sinf(angY),
+		cosf(angY) * sinf(angZ)
+	};
+	DirectX::XMFLOAT3 up{
+		cosf(angY + DirectX::XM_PIDIV2)* cosf(angZ),
+		sinf(angY + DirectX::XM_PIDIV2),
+		cosf(angY + DirectX::XM_PIDIV2)* sinf(angZ)
+	};
+	right = DirectX::XMFLOAT3(
+		 up.y * dir.z - up.z * dir.y,
+		-up.x * dir.z + up.z * dir.x,
+		 up.x * dir.y - up.y * dir.x
+	);
+	right.y = 0.0f;
+
+	right.x /= sqrt(pow(right.x, 2) + pow(right.y, 2) + pow(right.z, 2));
+	right.z /= sqrt(pow(right.x, 2) + pow(right.y, 2) + pow(right.z, 2));
+
+	if (fabs(dir.x) > 1e-5f || fabs(dir.z) > 1e-5f) {
+		forward = DirectX::XMFLOAT3(dir.x, 0.0f, dir.z);
+	} else {
+		forward = DirectX::XMFLOAT3(up.x, 0.0f, up.z);
+	}
+
+	forward.x /= sqrt(pow(forward.x, 2) + pow(forward.y, 2) + pow(forward.z, 2));
+	forward.z /= sqrt(pow(forward.x, 2) + pow(forward.y, 2) + pow(forward.z, 2));
+}
 
 bool Renderer::init(HWND hWnd) {
+	HRESULT hr{ S_OK };
+
 	// Create a DirectX graphics interface factory.
 	IDXGIFactory* factory{};
-	HRESULT hr{ CreateDXGIFactory(__uuidof(IDXGIFactory), (void**)&factory) };
+	hr = CreateDXGIFactory(__uuidof(IDXGIFactory), (void**)&factory);
 	if (FAILED(hr)) {
 		return false;
 	}
@@ -32,7 +63,7 @@ bool Renderer::init(HWND hWnd) {
 
 	// initial camera setup
 	camera = Camera{
-		.poi{ DirectX::XMFLOAT3(0, 0, 0) },
+		.poi{ 0.0f, 0.0f, 0.0f },
 		.r{ 5.0f },
 		.angZ{ - DirectX::XM_PI / 2 },
 		.angY{ DirectX::XM_PI / 4 },
@@ -46,6 +77,31 @@ bool Renderer::init(HWND hWnd) {
 	}
 
 	return SUCCEEDED(hr);
+}
+
+void Renderer::term() {
+	SAFE_RELEASE(backBufferRTV);
+	SAFE_RELEASE(swapChain);
+	SAFE_RELEASE(deviceContext);
+
+#ifdef _DEBUG
+	if (device) {
+		ID3D11Debug* debug{};
+		HRESULT hr{ device->QueryInterface(__uuidof(ID3D11Debug), (void**)&debug) };
+		if (FAILED(hr)) {
+			return;
+		}
+		if (debug->AddRef() != 3) {
+			debug->ReportLiveDeviceObjects(D3D11_RLDO_DETAIL | D3D11_RLDO_IGNORE_INTERNAL);
+		}
+
+		debug->Release();
+
+		SAFE_RELEASE(debug);
+	}
+#endif
+
+	SAFE_RELEASE(device);
 }
 
 IDXGIAdapter* Renderer::selectIDXGIAdapter(IDXGIFactory* factory) {
@@ -121,11 +177,37 @@ HRESULT Renderer::createDeviceAndSwapChain(HWND hWnd, IDXGIAdapter* adapter) {
 	return hr;
 }
 
-void Renderer::term() {
+bool Renderer::resize(UINT width, UINT height) {
+	if (this->width == width && this->height == height) {
+		return true;
+	}
+
 	SAFE_RELEASE(backBufferRTV);
-	SAFE_RELEASE(swapChain);
-	SAFE_RELEASE(deviceContext);
-	SAFE_RELEASE(device);
+
+	HRESULT hr{ swapChain->ResizeBuffers(2, width, height, DXGI_FORMAT_R8G8B8A8_UNORM, 0) };
+	if (FAILED(hr)) {
+		return false;
+	}
+
+	this->width = width;
+	this->height = height;
+
+	hr = setupBackBuffer();
+	if (FAILED(hr)) {
+		return false;
+	}
+
+	// setup skybox sphere
+	float n{ 0.1f };
+	float fov{ DirectX::XM_PI / 3 };
+	float halfW{ n * tanf(fov / 2) };
+	float halfH{ static_cast<float>(height / width * halfW) };
+
+	float r{ 1.1f * 2.0f * sqrtf(n * n + halfH * halfH + halfW * halfW) };
+
+	m_pSphere->resize(r);
+
+	return SUCCEEDED(hr);
 }
 
 bool Renderer::update() {
@@ -137,23 +219,30 @@ bool Renderer::update() {
 		prevUSec = usec;
 	}
 
+	// move camera
+	{
+		DirectX::XMFLOAT3 cf, cr;
+		camera.getDirections(cf, cr);
+		camera.poi = DirectX::XMFLOAT3(
+			camera.poi.x + (cf.x * forwardDelta + cr.x * rightDelta) * (usec - prevUSec) / 1e6f,
+			camera.poi.y + (cf.y * forwardDelta + cr.y * rightDelta) * (usec - prevUSec) / 1e6f,
+			camera.poi.z + (cf.z * forwardDelta + cr.z * rightDelta) * (usec - prevUSec) / 1e6f
+		);
+	}
+
 	if (isModelRotate) {
 		angle += modelRotationSpeed * (usec - prevUSec) / 1e6; 	// обновление угла вращения
 
-		ModelBuffer geometryBuffer{
-			// матрица вращения вокруг оси
-			DirectX::XMMatrixRotationAxis(
-				// вектор, описывающий ось вращения
-				DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 1.0f),
-				static_cast<float>(angle)
-			) 
-		};
-
-		// обновление буфера
-		deviceContext->UpdateSubresource(this->modelBuffer, 0, nullptr, &geometryBuffer, 0, 0);
+		m_pCube->update(static_cast<float>(angle));
 	}
 
 	prevUSec = usec;
+
+	DirectX::XMFLOAT3 cameraPos{
+		camera.poi.x + camera.r * cosf(camera.angY) * cosf(camera.angZ),
+		camera.poi.y + camera.r * sinf(camera.angY),
+		camera.poi.z + camera.r * cosf(camera.angY) * sinf(camera.angZ)
+	};
 
 	// Setup camera
 	DirectX::XMMATRIX v{
@@ -161,9 +250,9 @@ bool Renderer::update() {
 		DirectX::XMMatrixLookAtLH(
 			// позиция камеры
 			DirectX::XMVectorSet(
-				camera.poi.x + camera.r * cosf(camera.angY) * cosf(camera.angZ),
-				camera.poi.y + camera.r * sinf(camera.angY),
-				camera.poi.z + camera.r * cosf(camera.angY) * sinf(camera.angZ),
+				cameraPos.x,
+				cameraPos.y,
+				cameraPos.z,
 				0.0f
 			),
 			// позиция точки фокуса
@@ -211,6 +300,7 @@ bool Renderer::update() {
 
 	ViewProjectionBuffer& sceneBuffer = *reinterpret_cast<ViewProjectionBuffer*>(subresource.pData);
 	sceneBuffer.vp = DirectX::XMMatrixMultiply(v, p);
+	sceneBuffer.cameraPos = DirectX::XMFLOAT4(cameraPos.x, cameraPos.y, cameraPos.z, 0.0f);
 	deviceContext->Unmap(this->viewProjectionBuffer, 0);
 
 	return SUCCEEDED(hr);
@@ -243,46 +333,13 @@ bool Renderer::render() {
 	};
 	deviceContext->RSSetScissorRects(1, &rect);
 
-	//deviceContext->RSSetState(rasterizerState);
+	m_pSphere->render(sampler, viewProjectionBuffer);
 
-	ID3D11SamplerState* samplers[]{ sampler };
-	deviceContext->PSSetSamplers(0, 1, samplers);
+	deviceContext->RSSetState(rasterizerState);
 
-	ID3D11ShaderResourceView* resources[]{ textureView };
-	deviceContext->PSSetShaderResources(0, 1, resources);
-
-	deviceContext->IASetIndexBuffer(indexBuffer, DXGI_FORMAT_R16_UINT, 0);
-	ID3D11Buffer* vertexBuffers[]{ vertexBuffer };
-	UINT strides[]{ 20 };
-	UINT offsets[]{ 0 };
-	ID3D11Buffer* cbuffers[]{ viewProjectionBuffer, modelBuffer };
-	deviceContext->IASetVertexBuffers(0, 1, vertexBuffers, strides, offsets);
-	deviceContext->IASetInputLayout(inputLayout);
-	deviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	deviceContext->VSSetShader(vertexShader, nullptr, 0);
-	deviceContext->VSSetConstantBuffers(0, 2, cbuffers);
-	deviceContext->PSSetShader(pixelShader, nullptr, 0);
-	deviceContext->DrawIndexed(36, 0, 0);
+	m_pCube->render(sampler, viewProjectionBuffer);
 
 	return SUCCEEDED(swapChain->Present(0, 0));
-}
-
-bool Renderer::resize(UINT width, UINT height) {
-	if (this->width == width && this->height == height) {
-		return true;
-	}
-
-	SAFE_RELEASE(backBufferRTV);
-
-	HRESULT hr{ swapChain->ResizeBuffers(2, width, height, DXGI_FORMAT_R8G8B8A8_UNORM, 0) };
-	if (FAILED(hr)) {
-		return false;
-	}
-
-	this->width = width;
-	this->height = height;
-
-	return SUCCEEDED(setupBackBuffer());
 }
 
 void Renderer::mouseRBPressed(bool isPressed, int x, int y) {
@@ -314,8 +371,55 @@ void Renderer::mouseWheel(int delta) {
 }
 
 void Renderer::keyPressed(int keyCode) {
-	if (keyCode == ' ') {
-		isModelRotate = !isModelRotate;
+	switch (keyCode) {
+		case ' ':
+			isModelRotate = !isModelRotate;
+			break;
+
+		case 'W':
+		case 'w':
+			forwardDelta -= panSpeed;
+			break;
+
+		case 'S':
+		case 's':
+			forwardDelta += panSpeed;
+			break;
+
+		case 'D':
+		case 'd':
+			rightDelta -= panSpeed;
+			break;
+
+		case 'A':
+		case 'a':
+			rightDelta += panSpeed;
+			break;
+
+	}
+}
+
+void Renderer::keyReleased(int keyCode) {
+	switch (keyCode) {
+		case 'W':
+		case 'w':
+			forwardDelta += panSpeed;
+			break;
+
+		case 'S':
+		case 's':
+			forwardDelta -= panSpeed;
+			break;
+
+		case 'D':
+		case 'd':
+			rightDelta += panSpeed;
+			break;
+
+		case 'A':
+		case 'a':
+			rightDelta -= panSpeed;
+			break;
 	}
 }
 
@@ -335,126 +439,10 @@ HRESULT Renderer::setupBackBuffer() {
 HRESULT Renderer::initScene() {
 	HRESULT hr{ S_OK };
 
-	// create vertex buffer
-	{
-		Vertex vertices[24]{
-			// Bottom face
-			{ { -0.5, -0.5,  0.5 }, { 0, 1 }},
-			{ {  0.5, -0.5,  0.5 }, { 1, 1 }},
-			{ {  0.5, -0.5, -0.5 }, { 1, 0 }},
-			{ { -0.5, -0.5, -0.5 }, { 0, 0 }},
-			// Front face
-			{ { -0.5,  0.5, -0.5 }, { 0, 1 }},
-			{ {  0.5,  0.5, -0.5 }, { 1, 1 }},
-			{ {  0.5,  0.5,  0.5 }, { 1, 0 }},
-			{ { -0.5,  0.5,  0.5 }, { 0, 0 }},
-			// Top face
-			{ {  0.5, -0.5, -0.5 }, { 0, 1 }},
-			{ {  0.5, -0.5,  0.5 }, { 1, 1 }},
-			{ {  0.5,  0.5,  0.5 }, { 1, 0 }},
-			{ {  0.5,  0.5, -0.5 }, { 0, 0 }},
-			// Back face
-			{ { -0.5, -0.5,  0.5 }, { 0, 1 }},
-			{ { -0.5, -0.5, -0.5 }, { 1, 1 }},
-			{ { -0.5,  0.5, -0.5 }, { 1, 0 }},
-			{ { -0.5,  0.5,  0.5 }, { 0, 0 }},
-			// Right face
-			{ {  0.5, -0.5,  0.5 }, { 0, 1 }},
-			{ { -0.5, -0.5,  0.5 }, { 1, 1 }},
-			{ { -0.5,  0.5,  0.5 }, { 1, 0 }},
-			{ {  0.5,  0.5,  0.5 }, { 0, 0 }},
-			// Left face
-			{ { -0.5, -0.5, -0.5 }, { 0, 1 }},
-			{ {  0.5, -0.5, -0.5 }, { 1, 1 }},
-			{ {  0.5,  0.5, -0.5 }, { 1, 0 }},
-			{ { -0.5,  0.5, -0.5 }, { 0, 0 }}
-		};
-
-		hr = createVertexBuffer(vertices, sizeof(vertices) / sizeof(*vertices));
-		if (FAILED(hr)) {
-			return hr;
-		}
-
-		hr = SetResourceName(vertexBuffer, "VertexBuffer");
-		if (FAILED(hr)) {
-			return hr;
-		}
-	}
-
-	// create index buffer
-	{
-		UINT16 indices[36]{
-			 0,	 2,  1,  0,  3,  2,
-			 4,	 6,  5,  4,  7,  6,
-			 8,	10,  9,  8, 11, 10,
-			12, 14, 13, 12, 15, 14,
-			16, 18, 17, 16, 19, 18,
-			20, 22, 21, 20, 23, 22
-		};
-
-		hr = createIndexBuffer(indices, sizeof(indices) / sizeof(*indices));
-		if (FAILED(hr)) {
-			return hr;
-		}
-
-		hr = SetResourceName(indexBuffer, "IndexBuffer");
-		if (FAILED(hr)) {
-			return hr;
-		}
-	}
-
-	// shaders processing
-	ID3DBlob* vertexShaderCode{};
-	{
-		hr = compileAndCreateShader(L"VertexShader.vs", (ID3D11DeviceChild**)&vertexShader, &vertexShaderCode);
-		if (FAILED(hr)) {
-			return hr;
-		}
-
-		hr = compileAndCreateShader(L"PixelShader.ps", (ID3D11DeviceChild**)&pixelShader);
-		if (FAILED(hr)) {
-			return hr;
-		}
-	}
-
-	// create input layout
-	{
-		D3D11_INPUT_ELEMENT_DESC InputDesc[]{
-			{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-			{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0 }
-		};
-
-		hr = device->CreateInputLayout(
-			InputDesc,
-			2,
-			vertexShaderCode->GetBufferPointer(),
-			vertexShaderCode->GetBufferSize(),
-			&inputLayout
-		);
-		if (FAILED(hr)) {
-			return hr;
-		}
-
-		hr = SetResourceName(inputLayout, "InputLayout");
-		if (FAILED(hr)) {
-			return hr;
-		}
-	}
-	SAFE_RELEASE(vertexShaderCode);
-
-	// create model buffer
-	{
-		ModelBuffer modelBuffer{ DirectX::XMMatrixIdentity() };
-
-		hr = createModelBuffer(modelBuffer);
-		if (FAILED(hr)) {
-			return hr;
-		}
-
-		hr = SetResourceName(this->modelBuffer, "GeomBuffer");
-		if (FAILED(hr)) {
-			return hr;
-		}
+	m_pCube = new Cube(device, deviceContext);
+	hr = m_pCube->init();
+	if (FAILED(hr)) {
+		return hr;
 	}
 
 	// create view-projection buffer
@@ -483,160 +471,30 @@ HRESULT Renderer::initScene() {
 		}
 	}
 
-	// load texture
-	TextureDesc textureDesc{};
-	{
-		const std::wstring textureName{ L"../Common/Kitty.dds" };
-
-		bool ddsRes{ LoadDDS(textureName.c_str(), textureDesc) };
-
-		DXGI_FORMAT textureFmt{ textureDesc.fmt };
-
-		D3D11_TEXTURE2D_DESC desc{
-			// размеры в текселях
-			textureDesc.width, textureDesc.height,
-			textureDesc.mipmapsCount, 1,
-			textureDesc.fmt, { 1, 0 },
-			D3D11_USAGE_IMMUTABLE,
-			D3D11_BIND_SHADER_RESOURCE
-		};
-
-		// размеры текстуры в блоках
-		UINT32 blockWidth{ static_cast<UINT32>(std::ceil(desc.Width / 4)) };
-		UINT32 blockHeight{ static_cast<UINT32>(std::ceil(desc.Height / 4)) };
-
-		// размер строки пикселей в байтах
-		UINT32 pitch{ blockWidth * GetBytesPerBlock(desc.Format) };
-		const char* src{ reinterpret_cast<const char*>(textureDesc.pData) };
-
-		// расчет mip уровней
-		std::vector<D3D11_SUBRESOURCE_DATA> data;
-		data.resize(desc.MipLevels);
-		for (UINT32 i{}; i < desc.MipLevels; ++i) {
-			data[i].pSysMem = src;
-			data[i].SysMemPitch = pitch;
-			data[i].SysMemSlicePitch = 0;
-
-			src += pitch * blockHeight;
-			blockHeight = (std::max)(1u, blockHeight / 2);
-			blockWidth = (std::max)(1u, blockWidth / 2);
-			pitch = blockWidth * GetBytesPerBlock(desc.Format);
-		}
-		
-		// создание текстуры
-		hr = device->CreateTexture2D(&desc, data.data(), &texture);
-		if (FAILED(hr)) {
-			return hr;
-		}
-
-		hr = SetResourceName(texture, WCSToMBS(textureName));
-		if (FAILED(hr)) {
-			return hr;
-		}
-	}
-
-	// create view
-	{
-		// resource view для обработки в шейдерах
-		D3D11_SHADER_RESOURCE_VIEW_DESC desc{
-			.Format{ textureDesc.fmt },
-			.ViewDimension{ D3D11_SRV_DIMENSION_TEXTURE2D },
-			.Texture2D{
-				.MostDetailedMip{},
-				.MipLevels{ textureDesc.mipmapsCount }
-			}
-		};
-
-		hr = device->CreateShaderResourceView(texture, &desc, &textureView);
-	}
-	free(textureDesc.pData);
-
 	// create sampler
 	{
-		D3D11_SAMPLER_DESC desc{
-			// метод фильтрации
-			.Filter{ D3D11_FILTER_ANISOTROPIC },
-			// методы обработки координат за границами
-			// WRAP - повторение текстуры
-			.AddressU{ D3D11_TEXTURE_ADDRESS_WRAP },
-			.AddressV{ D3D11_TEXTURE_ADDRESS_WRAP },
-			.AddressW{ D3D11_TEXTURE_ADDRESS_WRAP },
-			.MipLODBias{}, // смещение уровня mipmap
-			.MaxAnisotropy{ 16 }, // настройка аниз фильтр
-			.ComparisonFunc{ D3D11_COMPARISON_NEVER },
-			// цвет для ADDRESS_BORDER
-			.BorderColor{ 1.0f, 1.0f, 1.0f, 1.0f },
-			// диапазон mipmap
-			.MinLOD{ -FLT_MAX },
-			.MaxLOD{ FLT_MAX }
-		};
-
-		hr = device->CreateSamplerState(&desc, &sampler);
+		hr = createSampler();
 		if (FAILED(hr)) {
 			return hr;
 		}
+	}
+
+	m_pSphere = new Sphere(device, deviceContext);
+	hr = m_pSphere->init();
+	if (FAILED(hr)) {
+		return hr;
 	}
 
 	return hr;
 }
 
 void Renderer::termScene() {
-	SAFE_RELEASE(rasterizerState);
-
-	SAFE_RELEASE(inputLayout);
-	SAFE_RELEASE(pixelShader);
-	SAFE_RELEASE(vertexBuffer);
-
-	SAFE_RELEASE(indexBuffer);
-	SAFE_RELEASE(vertexBuffer);
-
 	SAFE_RELEASE(viewProjectionBuffer);
-	SAFE_RELEASE(modelBuffer);
-}
+	SAFE_RELEASE(rasterizerState);
+	SAFE_RELEASE(sampler);
 
-HRESULT Renderer::createVertexBuffer(Vertex(&vertices)[], UINT numVertices) {
-	D3D11_BUFFER_DESC desc{
-		.ByteWidth{ sizeof(Vertex)* numVertices },
-		.Usage{ D3D11_USAGE_IMMUTABLE },
-		.BindFlags{ D3D11_BIND_VERTEX_BUFFER }
-	};
-
-	D3D11_SUBRESOURCE_DATA data{
-		.pSysMem{ vertices },
-		.SysMemPitch{ sizeof(Vertex) * numVertices }
-	};
-
-	return device->CreateBuffer(&desc, &data, &vertexBuffer);
-}
-
-HRESULT Renderer::createIndexBuffer(USHORT(&indices)[], UINT numIndices) {
-	D3D11_BUFFER_DESC desc{
-		.ByteWidth{ sizeof(USHORT)* numIndices },
-		.Usage{ D3D11_USAGE_IMMUTABLE },
-		.BindFlags{ D3D11_BIND_INDEX_BUFFER }
-	};
-
-	D3D11_SUBRESOURCE_DATA data{
-		.pSysMem{ indices },
-		.SysMemPitch{ sizeof(USHORT)* numIndices }
-	};
-
-	return device->CreateBuffer(&desc, &data, &indexBuffer);
-}
-
-HRESULT Renderer::createModelBuffer(ModelBuffer& modelBuffer) {
-	D3D11_BUFFER_DESC desc{
-		.ByteWidth{ sizeof(ModelBuffer) },
-		.Usage{ D3D11_USAGE_DEFAULT },				// храним в VRAM, изменяем
-		.BindFlags{ D3D11_BIND_CONSTANT_BUFFER }	// константный
-	};
-
-	D3D11_SUBRESOURCE_DATA data{
-		.pSysMem{ &modelBuffer },
-		.SysMemPitch{ sizeof(modelBuffer) }
-	};
-
-	return device->CreateBuffer(&desc, &data, &this->modelBuffer);
+	m_pCube->term();
+	m_pSphere->term();
 }
 
 HRESULT Renderer::createViewProjectionBuffer() {
@@ -653,106 +511,31 @@ HRESULT Renderer::createViewProjectionBuffer() {
 HRESULT Renderer::createRasterizerState() {
 	D3D11_RASTERIZER_DESC desc{
 		.FillMode{ D3D11_FILL_SOLID },
-		.CullMode{ D3D11_CULL_NONE },	// draw all sides
+		.CullMode{ D3D11_CULL_BACK },	// draw all sides
 		.DepthClipEnable{ TRUE }
 	};
 
 	return device->CreateRasterizerState(&desc, &rasterizerState);
 }
 
-HRESULT Renderer::compileAndCreateShader(const std::wstring& path, ID3D11DeviceChild** ppShader, ID3DBlob** ppCode) {
-	// Try to load shader's source code first
-	FILE* pFile{};
-	_wfopen_s(&pFile, path.c_str(), L"rb");
-	if (!pFile) {
-		return E_FAIL;
-	}
+HRESULT Renderer::createSampler() {
+	D3D11_SAMPLER_DESC desc{
+		// метод фильтрации
+		.Filter{ D3D11_FILTER_ANISOTROPIC },
+		// методы обработки координат за границами
+		// WRAP - повторение текстуры
+		.AddressU{ D3D11_TEXTURE_ADDRESS_WRAP },
+		.AddressV{ D3D11_TEXTURE_ADDRESS_WRAP },
+		.AddressW{ D3D11_TEXTURE_ADDRESS_WRAP },
+		.MipLODBias{}, // смещение уровня mipmap
+		.MaxAnisotropy{ 16 }, // настройка аниз фильтр
+		.ComparisonFunc{ D3D11_COMPARISON_NEVER },
+		// цвет для ADDRESS_BORDER
+		.BorderColor{ 1.0f, 1.0f, 1.0f, 1.0f },
+		// диапазон mipmap
+		.MinLOD{ -FLT_MAX },
+		.MaxLOD{ FLT_MAX }
+	}; 
 
-	fseek(pFile, 0, SEEK_END);
-	long long size = _ftelli64(pFile);
-	fseek(pFile, 0, SEEK_SET);
-
-	std::vector<char> data;
-	data.resize(size + 1);
-
-	size_t rd{ fread(data.data(), 1, size, pFile) };
-	assert(rd == (size_t)size);
-
-	fclose(pFile);
-
-	// Determine shader's type
-	std::wstring ext{ Extension(path) };
-
-	std::string entryPoint{ WCSToMBS(ext) };
-	std::string platform{ entryPoint + "_5_0"};
-
-	// Setup flags
-	UINT flags{};
-#ifdef _DEBUG
-	flags |= D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
-#endif // _DEBUG
-
-	// Try to compile
-	ID3DBlob* pCode{};
-	ID3DBlob* pErrMsg{};
-	HRESULT hr{ D3DCompile(
-		data.data(),
-		data.size(),
-		WCSToMBS(path).c_str(),
-		nullptr,
-		nullptr,
-		entryPoint.c_str(),
-		platform.c_str(),
-		flags,
-		0,
-		&pCode,
-		&pErrMsg
-	) };
-
-	if (FAILED(hr)) {
-		if (pErrMsg) {
-			OutputDebugStringA(static_cast<const char*>(pErrMsg->GetBufferPointer()));
-		}
-		return hr;
-	}
-	SAFE_RELEASE(pErrMsg);
-
-	// Create shader itself if anything else is OK
-	if (ext == L"vs") {
-		ID3D11VertexShader* pVertexShader{};
-		hr = device->CreateVertexShader(
-			pCode->GetBufferPointer(),
-			pCode->GetBufferSize(),
-			nullptr,
-			&pVertexShader
-		);
-		if (FAILED(hr)) {
-			return hr;
-		}
-
-		*ppShader = pVertexShader;
-	} else if (ext == L"ps") {
-		ID3D11PixelShader* pPixelShader{};
-		hr = device->CreatePixelShader(
-			pCode->GetBufferPointer(),
-			pCode->GetBufferSize(),
-			nullptr,
-			&pPixelShader
-		);
-		if (FAILED(hr)) {
-			return hr;
-		}
-
-		*ppShader = pPixelShader;
-	}
-
-	hr = SetResourceName(*ppShader, WCSToMBS(path).c_str());
-
-	if (ppCode) {
-		*ppCode = pCode;
-	} else {
-		SAFE_RELEASE(pCode);
-	}
-
-	return hr;
+	return device->CreateSamplerState(&desc, &sampler);
 }

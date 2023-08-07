@@ -36,6 +36,15 @@
     <ClInclude Include="Texture.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Cube.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ShaderProcessor.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Sphere.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="ComputerGraphicsAlgorithms.cpp">
@@ -45,6 +54,15 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Texture.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Cube.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ShaderProcessor.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Sphere.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -62,10 +80,19 @@
     </Image>
   </ItemGroup>
   <ItemGroup>
-    <None Include="PixelShader.ps">
+    <None Include="CubeShader.ps">
       <Filter>Shaders</Filter>
     </None>
-    <None Include="VertexShader.vs">
+    <None Include="CubeShader.vs">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="SphereTexture.ps" />
+    <None Include="SphereTexture.vs" />
+    <None Include="packages.config" />
+    <None Include="SphereShader.vs">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="SphereShader.ps">
       <Filter>Shaders</Filter>
     </None>
   </ItemGroup>

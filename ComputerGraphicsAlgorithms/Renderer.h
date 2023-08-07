@@ -9,20 +9,18 @@
 
 #include "Texture.h"
 
+#include "Cube.h"
+#include "Sphere.h"
+
 #define _MATH_DEFINES_DEFINED
 
+class Cube;
+class Sphere;
+
 class Renderer {
-    typedef struct Vertex {
-        DirectX::XMFLOAT3 point;
-        DirectX::XMFLOAT2 texture;
-    } Vertex;
-
-    typedef struct ModelBuffer {
-        DirectX::XMMATRIX m;
-    } ModelBuffer;
-
     typedef struct ViewProjectionBuffer {
         DirectX::XMMATRIX vp;
+        DirectX::XMFLOAT4 cameraPos;
     } ViewProjectionBuffer;
 
     typedef struct Camera {
@@ -30,10 +28,12 @@ class Renderer {
         float r;    // distance to POI
         float angZ;    // angle in plane x0z (left-right)
         float angY; // angle from plane x0z (up-down)
+
+        void getDirections(DirectX::XMFLOAT3& forward, DirectX::XMFLOAT3& right);
     } Camera;
 
-    const float cameraRotationSpeed{ DirectX::XM_PI * 2.0f };
-    const float modelRotationSpeed{ DirectX::XM_PI / 2.0f };
+    const float cameraRotationSpeed{ DirectX::XM_2PI };
+    const float modelRotationSpeed{ DirectX::XM_PIDIV2 };
 
     ID3D11Device* device{};
     ID3D11DeviceContext* deviceContext{};
@@ -41,48 +41,46 @@ class Renderer {
     IDXGISwapChain* swapChain{};
     ID3D11RenderTargetView* backBufferRTV{};
 
-    ID3D11Buffer* vertexBuffer{};
-    ID3D11Buffer* indexBuffer{};
+    Cube* m_pCube{};
+    Sphere* m_pSphere{};
 
-    ID3D11Buffer* modelBuffer{};
     ID3D11Buffer* viewProjectionBuffer{};
-
-    ID3D11VertexShader* vertexShader{};
-    ID3D11PixelShader* pixelShader{};
-    ID3D11InputLayout* inputLayout{};
-
     ID3D11RasterizerState* rasterizerState{};
-
-    ID3D11Texture2D* texture{};
-    ID3D11ShaderResourceView* textureView{};
     ID3D11SamplerState* sampler{};
 
     UINT width{ 16 };
     UINT height{ 16 };
 
-    Camera camera;
+    Camera camera{};
+
     bool isMRBPressed{};
     int prevMouseX{};
     int prevMouseY{};
+
     bool isModelRotate{};
     double angle{};
+
+    const float panSpeed{ 2.0 };
+
+    float forwardDelta{};
+    float rightDelta{};
 
     size_t prevUSec{};
 
 public:
-    Renderer() = default;
-
     bool init(HWND hWnd);
     void term();
 
+    bool resize(UINT width, UINT height);
     bool update();
     bool render();
-    bool resize(UINT width, UINT height);
 
     void mouseRBPressed(bool isPressed, int x, int y);
     void mouseMoved(int x, int y);
     void mouseWheel(int delta);
+
     void keyPressed(int keyCode);
+    void keyReleased(int keyCode);
 
 private:
     IDXGIAdapter* selectIDXGIAdapter(IDXGIFactory* factory);
@@ -93,11 +91,7 @@ private:
     HRESULT initScene();
     void termScene();
 
-    HRESULT createVertexBuffer(Vertex (&vertices)[], UINT numVertices);
-    HRESULT createIndexBuffer(USHORT (&indices)[], UINT numIndices);
-    HRESULT createModelBuffer(ModelBuffer& modelBuffer);
     HRESULT createViewProjectionBuffer();
     HRESULT createRasterizerState();
-
-    HRESULT compileAndCreateShader(const std::wstring& path, ID3D11DeviceChild** ppShader, ID3DBlob** ppCode = nullptr);
+    HRESULT createSampler();
 };

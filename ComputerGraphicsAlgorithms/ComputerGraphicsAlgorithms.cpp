@@ -214,6 +214,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) 
 			break;
 
 		case WM_KEYUP:
+			if (PressedKeys[wParam]) {
+				renderer->keyReleased((int)wParam);
+			}
 			PressedKeys[wParam] = false;
 			break;
 

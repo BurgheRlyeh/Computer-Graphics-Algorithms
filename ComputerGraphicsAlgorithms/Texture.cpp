@@ -144,7 +144,7 @@ bool LoadDDS(const std::wstring& filepath, TextureDesc& desc, bool singleMip) {
     desc.mipmapsCount = (header.flags & DDSD_MIPMAPCOUNT) != 0 ? (UINT32)header.mipMapCount : 1;
 
     if (singleMip) {
-        desc.mipmapsCount = 1;
+         desc.mipmapsCount = 1;
     }
 
     // Read texture format
