@@ -18,7 +18,6 @@ class Cube {
     ID3D11Device* m_pDevice{};
     ID3D11DeviceContext* m_pDeviceContext{};
 
-    // cube
     ID3D11Buffer*       m_pVertexBuffer{};
     ID3D11Buffer*       m_pIndexBuffer{};
     ID3D11Buffer*       m_pModelBuffer{};
@@ -28,6 +27,9 @@ class Cube {
 
     ID3D11Texture2D* m_pTexture{};
     ID3D11ShaderResourceView* m_pTextureView{};
+
+    float m_modelRotationSpeed{ DirectX::XM_PIDIV2 };
+    float m_angleRotationY{};
 
 public:
     Cube(ID3D11Device* device, ID3D11DeviceContext* deviceContext):
@@ -50,6 +52,8 @@ public:
 
     void update(float angle);
     void render(ID3D11SamplerState* sampler, ID3D11Buffer* viewProjectionBuffer);
+
+    float getModelRotationSpeed();
 
 private:
     HRESULT createVertexBuffer(Vertex(&vertices)[], UINT numVertices);

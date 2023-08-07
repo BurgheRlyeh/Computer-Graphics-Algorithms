@@ -191,31 +191,31 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) 
 			break;
 
 		case WM_RBUTTONDOWN:
-			renderer->mouseRBPressed(true, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
+			renderer->m_mouseHandler.mouseRBPressed(true, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
 			break;
 
 		case WM_RBUTTONUP:
-			renderer->mouseRBPressed(false, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
+			renderer->m_mouseHandler.mouseRBPressed(false, GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
 			break;
 
 		case WM_MOUSEMOVE:
-			renderer->mouseMoved(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
+			renderer->m_mouseHandler.mouseMoved(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
 			break;
 
 		case WM_MOUSEWHEEL:
-			renderer->mouseWheel(GET_WHEEL_DELTA_WPARAM(wParam));
+			renderer->m_mouseHandler.mouseWheel(GET_WHEEL_DELTA_WPARAM(wParam));
 			break;
 
 		case WM_KEYDOWN:
 			if (!PressedKeys[wParam]) {
-				renderer->keyPressed((int)wParam);
+				renderer->m_keyboardHandler.keyPressed((int)wParam);
 				PressedKeys[wParam] = true;
 			}
 			break;
 
 		case WM_KEYUP:
 			if (PressedKeys[wParam]) {
-				renderer->keyReleased((int)wParam);
+				renderer->m_keyboardHandler.keyReleased((int)wParam);
 			}
 			PressedKeys[wParam] = false;
 			break;

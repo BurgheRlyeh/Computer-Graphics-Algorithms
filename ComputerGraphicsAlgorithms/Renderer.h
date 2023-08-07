@@ -29,11 +29,47 @@ class Renderer {
         float angZ;    // angle in plane x0z (left-right)
         float angY; // angle from plane x0z (up-down)
 
+        float cameraRotationSpeed{ DirectX::XM_2PI };
+
+        float forwardDelta{};
+        float rightDelta{};
+
+        void move(float delta);
         void getDirections(DirectX::XMFLOAT3& forward, DirectX::XMFLOAT3& right);
     } Camera;
 
-    const float cameraRotationSpeed{ DirectX::XM_2PI };
-    const float modelRotationSpeed{ DirectX::XM_PIDIV2 };
+    typedef struct MouseHandler {
+        Renderer& renderer;
+
+        MouseHandler() = delete;
+        MouseHandler(Renderer& renderer):
+            renderer(renderer)
+        {}
+
+        bool isMRBPressed{};
+        int prevMouseX{};
+        int prevMouseY{};
+
+        void mouseRBPressed(bool isPressed, int x, int y);
+        void mouseMoved(int x, int y);
+        void mouseWheel(int delta);
+    } MouseHandler;
+
+    typedef struct KeyboardHandler {
+        Renderer& renderer;
+
+        KeyboardHandler() = delete;
+        KeyboardHandler(Renderer& renderer):
+            renderer(renderer)
+        {}
+
+    private:
+        const float panSpeed{ 2.0 };
+
+    public:
+        void keyPressed(int keyCode);
+        void keyReleased(int keyCode);
+    } KeyboardHandler;
 
     ID3D11Device* device{};
     ID3D11DeviceContext* deviceContext{};
@@ -53,34 +89,25 @@ class Renderer {
 
     Camera camera{};
 
-    bool isMRBPressed{};
-    int prevMouseX{};
-    int prevMouseY{};
-
     bool isModelRotate{};
-    double angle{};
-
-    const float panSpeed{ 2.0 };
-
-    float forwardDelta{};
-    float rightDelta{};
 
     size_t prevUSec{};
 
 public:
+    MouseHandler m_mouseHandler;
+    KeyboardHandler m_keyboardHandler;
+
+    Renderer():
+        m_mouseHandler(*this),
+        m_keyboardHandler(*this)
+    {}
+
     bool init(HWND hWnd);
     void term();
 
     bool resize(UINT width, UINT height);
     bool update();
     bool render();
-
-    void mouseRBPressed(bool isPressed, int x, int y);
-    void mouseMoved(int x, int y);
-    void mouseWheel(int delta);
-
-    void keyPressed(int keyCode);
-    void keyReleased(int keyCode);
 
 private:
     IDXGIAdapter* selectIDXGIAdapter(IDXGIFactory* factory);

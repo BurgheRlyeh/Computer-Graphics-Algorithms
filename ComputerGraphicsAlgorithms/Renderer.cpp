@@ -2,6 +2,16 @@
 #include "Renderer.h"
 #include "Texture.h"
 
+void Renderer::Camera::move(float delta) {
+	DirectX::XMFLOAT3 cf, cr;
+	getDirections(cf, cr);
+	poi = DirectX::XMFLOAT3(
+		poi.x + (cf.x * forwardDelta + cr.x * rightDelta) * delta,
+		poi.y + (cf.y * forwardDelta + cr.y * rightDelta) * delta,
+		poi.z + (cf.z * forwardDelta + cr.z * rightDelta) * delta
+	);
+}
+
 void Renderer::Camera::getDirections(DirectX::XMFLOAT3& forward, DirectX::XMFLOAT3& right) {
 	DirectX::XMFLOAT3 dir{
 		cosf(angY) * cosf(angZ),
@@ -31,6 +41,86 @@ void Renderer::Camera::getDirections(DirectX::XMFLOAT3& forward, DirectX::XMFLOA
 
 	forward.x /= sqrt(pow(forward.x, 2) + pow(forward.y, 2) + pow(forward.z, 2));
 	forward.z /= sqrt(pow(forward.x, 2) + pow(forward.y, 2) + pow(forward.z, 2));
+}
+
+void Renderer::MouseHandler::mouseRBPressed(bool isPressed, int x, int y) {
+	isMRBPressed = isPressed;
+	if (!isMRBPressed) {
+		return;
+	}
+
+	prevMouseX = x;
+	prevMouseY = y;
+}
+
+void Renderer::MouseHandler::mouseMoved(int x, int y) {
+	if (!isMRBPressed) {
+		return;
+	}
+
+	renderer.camera.angZ += -(float)(x - prevMouseX) / renderer.width * renderer.camera.cameraRotationSpeed;
+	renderer.camera.angY += (float)(y - prevMouseY) / renderer.width * renderer.camera.cameraRotationSpeed;
+	renderer.camera.angY = DirectX::XMMax(renderer.camera.angY, -renderer.m_pCube->getModelRotationSpeed());
+	renderer.camera.angY = DirectX::XMMin(renderer.camera.angY, renderer.m_pCube->getModelRotationSpeed());
+
+	prevMouseX = x;
+	prevMouseY = y;
+}
+
+void Renderer::MouseHandler::mouseWheel(int delta) {
+	renderer.camera.r = DirectX::XMMax(renderer.camera.r - delta / 100.0f, 1.0f);
+}
+
+void Renderer::KeyboardHandler::keyPressed(int keyCode) {
+	switch (keyCode) {
+		case ' ':
+			renderer.isModelRotate = !renderer.isModelRotate;
+			break;
+
+		case 'W':
+		case 'w':
+			renderer.camera.forwardDelta -= panSpeed;
+			break;
+
+		case 'S':
+		case 's':
+			renderer.camera.forwardDelta += panSpeed;
+			break;
+
+		case 'D':
+		case 'd':
+			renderer.camera.rightDelta -= panSpeed;
+			break;
+
+		case 'A':
+		case 'a':
+			renderer.camera.rightDelta += panSpeed;
+			break;
+	}
+}
+
+void Renderer::KeyboardHandler::keyReleased(int keyCode) {
+	switch (keyCode) {
+		case 'W':
+		case 'w':
+			renderer.camera.forwardDelta += panSpeed;
+			break;
+
+		case 'S':
+		case 's':
+			renderer.camera.forwardDelta -= panSpeed;
+			break;
+
+		case 'D':
+		case 'd':
+			renderer.camera.rightDelta += panSpeed;
+			break;
+
+		case 'A':
+		case 'a':
+			renderer.camera.rightDelta -= panSpeed;
+			break;
+	}
 }
 
 bool Renderer::init(HWND hWnd) {
@@ -220,20 +310,10 @@ bool Renderer::update() {
 	}
 
 	// move camera
-	{
-		DirectX::XMFLOAT3 cf, cr;
-		camera.getDirections(cf, cr);
-		camera.poi = DirectX::XMFLOAT3(
-			camera.poi.x + (cf.x * forwardDelta + cr.x * rightDelta) * (usec - prevUSec) / 1e6f,
-			camera.poi.y + (cf.y * forwardDelta + cr.y * rightDelta) * (usec - prevUSec) / 1e6f,
-			camera.poi.z + (cf.z * forwardDelta + cr.z * rightDelta) * (usec - prevUSec) / 1e6f
-		);
-	}
+	camera.move((usec - prevUSec) / 1e6f);
 
 	if (isModelRotate) {
-		angle += modelRotationSpeed * (usec - prevUSec) / 1e6; 	// обновление угла вращения
-
-		m_pCube->update(static_cast<float>(angle));
+		m_pCube->update((usec - prevUSec) / 1e6f);
 	}
 
 	prevUSec = usec;
@@ -340,87 +420,6 @@ bool Renderer::render() {
 	m_pCube->render(sampler, viewProjectionBuffer);
 
 	return SUCCEEDED(swapChain->Present(0, 0));
-}
-
-void Renderer::mouseRBPressed(bool isPressed, int x, int y) {
-	isMRBPressed = isPressed;
-	if (!isMRBPressed) {
-		return;
-	}
-
-	prevMouseX = x;
-	prevMouseY = y;
-}
-
-void Renderer::mouseMoved(int x, int y) {
-	if (!isMRBPressed) {
-		return;
-	}
-
-	camera.angZ += - (float)(x - prevMouseX) / width * cameraRotationSpeed;
-	camera.angY += (float)(y - prevMouseY) / width * cameraRotationSpeed;
-	camera.angY = DirectX::XMMax(camera.angY, -modelRotationSpeed);
-	camera.angY = DirectX::XMMin(camera.angY, modelRotationSpeed);
-
-	prevMouseX = x;
-	prevMouseY = y;
-}
-
-void Renderer::mouseWheel(int delta) {
-	camera.r = DirectX::XMMax(camera.r - delta / 100.0f, 1.0f);
-}
-
-void Renderer::keyPressed(int keyCode) {
-	switch (keyCode) {
-		case ' ':
-			isModelRotate = !isModelRotate;
-			break;
-
-		case 'W':
-		case 'w':
-			forwardDelta -= panSpeed;
-			break;
-
-		case 'S':
-		case 's':
-			forwardDelta += panSpeed;
-			break;
-
-		case 'D':
-		case 'd':
-			rightDelta -= panSpeed;
-			break;
-
-		case 'A':
-		case 'a':
-			rightDelta += panSpeed;
-			break;
-
-	}
-}
-
-void Renderer::keyReleased(int keyCode) {
-	switch (keyCode) {
-		case 'W':
-		case 'w':
-			forwardDelta += panSpeed;
-			break;
-
-		case 'S':
-		case 's':
-			forwardDelta -= panSpeed;
-			break;
-
-		case 'D':
-		case 'd':
-			rightDelta += panSpeed;
-			break;
-
-		case 'A':
-		case 'a':
-			rightDelta -= panSpeed;
-			break;
-	}
 }
 
 HRESULT Renderer::setupBackBuffer() {

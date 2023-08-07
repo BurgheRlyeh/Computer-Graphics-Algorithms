@@ -329,13 +329,15 @@ void Cube::term() {
 	SAFE_RELEASE(m_pTextureView);
 }
 
-void Cube::update(float angle) {
+void Cube::update(float delta) {
+	m_angleRotationY += m_modelRotationSpeed * delta;
+
 	ModelBuffer modelBuffer{
 		// матрица вращения вокруг оси
 		DirectX::XMMatrixRotationAxis(
 			// вектор, описывающий ось вращения
 			DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 1.0f),
-			angle
+			m_angleRotationY
 		)
 	};
 
@@ -362,4 +364,8 @@ void Cube::render(ID3D11SamplerState* sampler, ID3D11Buffer* viewProjectionBuffe
 	m_pDeviceContext->VSSetConstantBuffers(0, 2, cbuffers);
 	m_pDeviceContext->PSSetShader(m_pPixelShader, nullptr, 0);
 	m_pDeviceContext->DrawIndexed(36, 0, 0);
+}
+
+float Cube::getModelRotationSpeed() {
+	return m_modelRotationSpeed;
 }
