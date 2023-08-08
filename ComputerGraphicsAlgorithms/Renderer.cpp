@@ -273,6 +273,8 @@ bool Renderer::resize(UINT width, UINT height) {
 	}
 
 	SAFE_RELEASE(backBufferRTV);
+	SAFE_RELEASE(m_pDepthBuffer);
+	SAFE_RELEASE(m_pDepthBufferDSV);
 
 	HRESULT hr{ swapChain->ResizeBuffers(2, width, height, DXGI_FORMAT_R8G8B8A8_UNORM, 0) };
 	if (FAILED(hr)) {
@@ -313,7 +315,23 @@ bool Renderer::update() {
 	camera.move((usec - prevUSec) / 1e6f);
 
 	if (isModelRotate) {
-		m_pCube->update((usec - prevUSec) / 1e6f);
+
+		m_cubeAngleRotation += m_pCube->getModelRotationSpeed() * (usec - prevUSec) / 1e6f;
+
+		m_pCube->update(
+			0,
+			// матрица вращения вокруг оси
+			DirectX::XMMatrixRotationAxis(
+				// вектор, описывающий ось вращения
+				DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 1.0f),
+				m_cubeAngleRotation
+			)
+		);
+
+		m_pCube->update(
+			1,
+			DirectX::XMMatrixTranslation(2.0f, 0.0f, 0.0f)
+		);
 	}
 
 	prevUSec = usec;
@@ -360,10 +378,10 @@ bool Renderer::update() {
 	DirectX::XMMATRIX p{
 		// Матрица построения перспективы для левой руки
 		DirectX::XMMatrixPerspectiveLH(
-			2 * nearPlane * tanf(fov / 2),					// Ширина усеченного конуса в nearPlane
-			2 * nearPlane * tanf(fov / 2) * aspectRatio,	// Высота усеченного конуса в nearPlane
-			nearPlane,										// Расстояние до ближайшей плоскости отсечения
-			farPlane										// Расстояние до дальней плоскости отсечения
+			2 * farPlane * tanf(fov / 2),					// Ширина усеченного конуса в nearPlane
+			2 * farPlane * tanf(fov / 2) * aspectRatio,	// Высота усеченного конуса в nearPlane
+			farPlane,										// Расстояние до ближайшей плоскости отсечения
+			nearPlane										// Расстояние до дальней плоскости отсечения
 		)
 	};
 
@@ -390,10 +408,11 @@ bool Renderer::render() {
 	deviceContext->ClearState();
 
 	ID3D11RenderTargetView* views[]{ backBufferRTV };
-	deviceContext->OMSetRenderTargets(1, views, nullptr);
+	deviceContext->OMSetRenderTargets(1, views, m_pDepthBufferDSV);
 
 	static const FLOAT BackColor[4]{ 0.25f, 0.25f, 0.25f, 1.0f };
 	deviceContext->ClearRenderTargetView(backBufferRTV, BackColor);
+	deviceContext->ClearDepthStencilView(m_pDepthBufferDSV, D3D11_CLEAR_DEPTH, 0.0f, 0);
 
 	D3D11_VIEWPORT viewport{
 		.TopLeftX{},
@@ -413,11 +432,29 @@ bool Renderer::render() {
 	};
 	deviceContext->RSSetScissorRects(1, &rect);
 
-	m_pSphere->render(sampler, viewProjectionBuffer);
+	deviceContext->OMSetDepthStencilState(m_pDepthState, 0);
 
 	deviceContext->RSSetState(rasterizerState);
 
+	deviceContext->OMSetBlendState(m_pOpaqueBlendState, nullptr, 0xFFFFFFFF);
+
 	m_pCube->render(sampler, viewProjectionBuffer);
+
+	m_pSphere->render(sampler, viewProjectionBuffer);
+
+	DirectX::XMFLOAT3 cameraPos{
+		camera.poi.x + camera.r * cosf(camera.angY) * cosf(camera.angZ),
+		camera.poi.y + camera.r * sinf(camera.angY),
+		camera.poi.z + camera.r * cosf(camera.angY) * sinf(camera.angZ)
+	};
+
+	m_pRect->render(
+		sampler,
+		viewProjectionBuffer,
+		m_pTransDepthState,
+		m_pTransBlendState,
+		cameraPos
+	);
 
 	return SUCCEEDED(swapChain->Present(0, 0));
 }
@@ -431,6 +468,43 @@ HRESULT Renderer::setupBackBuffer() {
 
 	hr = device->CreateRenderTargetView(backBuffer, nullptr, &backBufferRTV);
 	SAFE_RELEASE(backBuffer);
+	if (FAILED(hr)) {
+		return hr;
+	}
+
+	D3D11_TEXTURE2D_DESC desc{
+		.Width{ width },
+		.Height{ height },
+		.MipLevels{ 1 },
+		.ArraySize{ 1 },
+		.Format{ DXGI_FORMAT_D32_FLOAT },
+		.SampleDesc{ 1, 0 },
+		.Usage{ D3D11_USAGE_DEFAULT },
+		.BindFlags{ D3D11_BIND_DEPTH_STENCIL },
+		.CPUAccessFlags{},
+		.MiscFlags{}
+	};
+
+	hr = device->CreateTexture2D(&desc, nullptr, &m_pDepthBuffer);
+	if (FAILED(hr)) {
+		return hr;
+	}
+
+	hr = SetResourceName(m_pDepthBuffer, "DepthBuffer");
+	if (FAILED(hr)) {
+		return hr;
+	}
+
+	device->CreateDepthStencilView(m_pDepthBuffer, nullptr, &m_pDepthBufferDSV);
+	if (FAILED(hr)) {
+		return hr;
+	}
+
+	hr = SetResourceName(m_pDepthBufferDSV, "DepthBufferView");
+	if (FAILED(hr)) {
+		return hr;
+	}
+
 
 	return hr;
 }
@@ -439,7 +513,7 @@ HRESULT Renderer::initScene() {
 	HRESULT hr{ S_OK };
 
 	m_pCube = new Cube(device, deviceContext);
-	hr = m_pCube->init();
+	hr = m_pCube->init(2);
 	if (FAILED(hr)) {
 		return hr;
 	}
@@ -470,6 +544,89 @@ HRESULT Renderer::initScene() {
 		}
 	}
 
+	// create blend states
+	{
+		D3D11_BLEND_DESC desc{
+			.AlphaToCoverageEnable{},
+			.IndependentBlendEnable{},
+			.RenderTarget{ {
+				.BlendEnable{ TRUE },
+				.SrcBlend{ D3D11_BLEND_SRC_ALPHA },
+				.DestBlend{ D3D11_BLEND_INV_SRC_ALPHA },
+				.BlendOp{ D3D11_BLEND_OP_ADD },
+				.SrcBlendAlpha{ D3D11_BLEND_ONE },
+				.DestBlendAlpha{ D3D11_BLEND_ZERO },
+				.BlendOpAlpha{ D3D11_BLEND_OP_ADD },
+				.RenderTargetWriteMask{ 
+					D3D11_COLOR_WRITE_ENABLE_RED
+						| D3D11_COLOR_WRITE_ENABLE_GREEN
+						| D3D11_COLOR_WRITE_ENABLE_BLUE
+				}
+			} }
+		};
+
+		hr = device->CreateBlendState(&desc, &m_pTransBlendState);
+		if (FAILED(hr)) {
+			return hr;
+		}
+
+		hr = SetResourceName(m_pTransBlendState, "TransBlendState");
+		if (FAILED(hr)) {
+			return hr;
+		}
+
+		desc.RenderTarget[0].BlendEnable = FALSE;
+		hr = device->CreateBlendState(&desc, &m_pOpaqueBlendState);
+		if (FAILED(hr)) {
+			return hr;
+		}
+
+		hr = SetResourceName(m_pOpaqueBlendState, "OpaqueBlendState");
+		if (FAILED(hr)) {
+			return hr;
+		}
+	}
+
+	// create reverse depth state
+	{
+		D3D11_DEPTH_STENCIL_DESC desc{
+			.DepthEnable{ TRUE },
+			.DepthWriteMask{ D3D11_DEPTH_WRITE_MASK_ALL },
+			.DepthFunc{ D3D11_COMPARISON_GREATER_EQUAL },
+			.StencilEnable{}
+		};
+
+		hr = device->CreateDepthStencilState(&desc, &m_pDepthState);
+		if (FAILED(hr)) {
+			return hr;
+		}
+
+		hr = SetResourceName(m_pDepthState, "DephtState");
+		if (FAILED(hr)) {
+			return hr;
+		}
+	}
+
+	// create reverse transparent depth state
+	{
+		D3D11_DEPTH_STENCIL_DESC desc{
+			.DepthEnable{ TRUE },
+			.DepthWriteMask{ D3D11_DEPTH_WRITE_MASK_ZERO },
+			.DepthFunc{ D3D11_COMPARISON_GREATER },
+			.StencilEnable{ FALSE }
+		};
+
+		hr = device->CreateDepthStencilState(&desc, &m_pTransDepthState);
+		if (FAILED(hr)) {
+			return hr;
+		}
+
+		hr = SetResourceName(m_pTransDepthState, "TransDepthState");
+		if (FAILED(hr)) {
+			return hr;
+		}
+	}
+
 	// create sampler
 	{
 		hr = createSampler();
@@ -484,6 +641,20 @@ HRESULT Renderer::initScene() {
 		return hr;
 	}
 
+	m_pRect = new Rect(device, deviceContext);
+
+	DirectX::XMFLOAT3 positions[]{
+		{ 1.0f, 0, 0.0f },
+		{ 1.2f, 0, 0.0f }
+	};
+
+	DirectX::XMFLOAT4 colors[]{
+		{ 0.5f, 0, 0.5f, 1.0f },
+		{ 0.5f, 0.5f, 0, 1.0f }
+	};
+
+	hr = m_pRect->init(positions, colors, 2);
+
 	return hr;
 }
 
@@ -491,6 +662,15 @@ void Renderer::termScene() {
 	SAFE_RELEASE(viewProjectionBuffer);
 	SAFE_RELEASE(rasterizerState);
 	SAFE_RELEASE(sampler);
+
+	SAFE_RELEASE(m_pDepthState);
+	SAFE_RELEASE(m_pTransDepthState);
+
+	SAFE_RELEASE(m_pTransBlendState);
+	SAFE_RELEASE(m_pOpaqueBlendState);
+
+	SAFE_RELEASE(m_pDepthBuffer);
+	SAFE_RELEASE(m_pDepthBufferDSV);
 
 	m_pCube->term();
 	m_pSphere->term();
@@ -510,7 +690,7 @@ HRESULT Renderer::createViewProjectionBuffer() {
 HRESULT Renderer::createRasterizerState() {
 	D3D11_RASTERIZER_DESC desc{
 		.FillMode{ D3D11_FILL_SOLID },
-		.CullMode{ D3D11_CULL_BACK },	// draw all sides
+		.CullMode{ D3D11_CULL_NONE },
 		.DepthClipEnable{ TRUE }
 	};
 

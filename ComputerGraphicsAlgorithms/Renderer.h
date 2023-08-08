@@ -11,11 +11,13 @@
 
 #include "Cube.h"
 #include "Sphere.h"
+#include "Rect.h"
 
 #define _MATH_DEFINES_DEFINED
 
 class Cube;
 class Sphere;
+class Rect;
 
 class Renderer {
     typedef struct ViewProjectionBuffer {
@@ -78,11 +80,26 @@ class Renderer {
     ID3D11RenderTargetView* backBufferRTV{};
 
     Cube* m_pCube{};
+    float m_cubeAngleRotation{};
+
     Sphere* m_pSphere{};
+
+    Rect* m_pRect{};
+    DirectX::XMFLOAT3 rect0Pos{ 1.0f, 0, 0 };
+    DirectX::XMFLOAT3 rect1Pos{ 1.2f, 0, 0 };
 
     ID3D11Buffer* viewProjectionBuffer{};
     ID3D11RasterizerState* rasterizerState{};
     ID3D11SamplerState* sampler{};
+
+    ID3D11Texture2D* m_pDepthBuffer;
+    ID3D11DepthStencilView* m_pDepthBufferDSV;
+
+    ID3D11DepthStencilState* m_pDepthState;
+    ID3D11DepthStencilState* m_pTransDepthState;
+
+    ID3D11BlendState* m_pTransBlendState;
+    ID3D11BlendState* m_pOpaqueBlendState;
 
     UINT width{ 16 };
     UINT height{ 16 };

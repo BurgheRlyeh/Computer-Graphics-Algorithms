@@ -2,39 +2,9 @@
 
 #include "ShaderProcessor.h"
 
-ID3D11Buffer* Cube::getVertexBuffer() {
-	return m_pVertexBuffer;
-};
+HRESULT Cube::init(int num) {
+	m_pModelBuffers.resize(num);
 
-ID3D11Buffer* Cube::getIndexBuffer() {
-	return m_pIndexBuffer;
-};
-
-ID3D11Buffer* Cube::getModelBuffer() {
-	return m_pModelBuffer;
-};
-
-ID3D11VertexShader* Cube::getVertexShader() {
-	return m_pVertexShader;
-};
-
-ID3D11PixelShader* Cube::getPixelShader() {
-	return m_pPixelShader;
-};
-
-ID3D11InputLayout* Cube::getInputLayout() {
-	return m_pInputLayout;
-};
-
-ID3D11Texture2D* Cube::getTexture() {
-	return m_pTexture;
-};
-
-ID3D11ShaderResourceView* Cube::getTextureView() {
-	return m_pTextureView;
-};
-
-HRESULT Cube::init() {
 	HRESULT hr{ S_OK };
 
 	// create vertex buffer
@@ -170,15 +140,15 @@ HRESULT Cube::init() {
 	SAFE_RELEASE(vertexShaderCode);
 
 	// create model buffer
-	{
-		CubeModelBuffer modelBuffer{ DirectX::XMMatrixIdentity() };
+	for (int idx{}; idx < num; ++idx) {
+		ModelBuffer modelBuffer{ DirectX::XMMatrixIdentity() };
 
-		hr = createModelBuffer(modelBuffer);
+		hr = createModelBuffer(modelBuffer, idx);
 		if (FAILED(hr)) {
 			return hr;
 		}
 
-		hr = SetResourceName(m_pModelBuffer, "GeomBuffer");
+		hr = SetResourceName(m_pModelBuffers[idx], "GeomBuffer" + idx);
 		if (FAILED(hr)) {
 			return hr;
 		}
@@ -244,9 +214,9 @@ HRESULT Cube::createIndexBuffer(USHORT(&indices)[], UINT numIndices) {
 	return m_pDevice->CreateBuffer(&desc, &data, &m_pIndexBuffer);
 }
 
-HRESULT Cube::createModelBuffer(CubeModelBuffer& modelBuffer) {
+HRESULT Cube::createModelBuffer(ModelBuffer& modelBuffer, int idx) {
 	D3D11_BUFFER_DESC desc{
-		.ByteWidth{ sizeof(CubeModelBuffer) },
+		.ByteWidth{ sizeof(ModelBuffer) },
 		.Usage{ D3D11_USAGE_DEFAULT },				// храним в VRAM, изменяем
 		.BindFlags{ D3D11_BIND_CONSTANT_BUFFER }	// константный
 	};
@@ -256,7 +226,7 @@ HRESULT Cube::createModelBuffer(CubeModelBuffer& modelBuffer) {
 		.SysMemPitch{ sizeof(modelBuffer) }
 	};
 
-	return m_pDevice->CreateBuffer(&desc, &data, &this->m_pModelBuffer);
+	return m_pDevice->CreateBuffer(&desc, &data, &m_pModelBuffers[idx]);
 }
 
 HRESULT Cube::createTexture(TextureDesc& textureDesc) {
@@ -320,7 +290,9 @@ HRESULT Cube::createResourceView(TextureDesc& textureDesc) {
 void Cube::term() {
 	SAFE_RELEASE(m_pVertexBuffer);
 	SAFE_RELEASE(m_pIndexBuffer);
-	SAFE_RELEASE(m_pModelBuffer);
+	for (auto pModelBuffer : m_pModelBuffers) {
+		SAFE_RELEASE(pModelBuffer);
+	}
 	SAFE_RELEASE(m_pVertexShader);
 	SAFE_RELEASE(m_pPixelShader);
 	SAFE_RELEASE(m_pInputLayout);
@@ -329,20 +301,11 @@ void Cube::term() {
 	SAFE_RELEASE(m_pTextureView);
 }
 
-void Cube::update(float delta) {
-	m_angleRotationY += m_modelRotationSpeed * delta;
-
-	ModelBuffer modelBuffer{
-		// матрица вращения вокруг оси
-		DirectX::XMMatrixRotationAxis(
-			// вектор, описывающий ось вращения
-			DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 1.0f),
-			m_angleRotationY
-		)
-	};
+void Cube::update(int idx, DirectX::XMMATRIX matrix) {
+	ModelBuffer modelBuffer{ matrix };
 
 	// обновление буфера
-	m_pDeviceContext->UpdateSubresource(m_pModelBuffer, 0, nullptr, &modelBuffer, 0, 0);
+	m_pDeviceContext->UpdateSubresource(m_pModelBuffers[idx], 0, nullptr, &modelBuffer, 0, 0);
 }
 
 void Cube::render(ID3D11SamplerState* sampler, ID3D11Buffer* viewProjectionBuffer) {
@@ -356,14 +319,21 @@ void Cube::render(ID3D11SamplerState* sampler, ID3D11Buffer* viewProjectionBuffe
 	ID3D11Buffer* vertexBuffers[]{ m_pVertexBuffer };
 	UINT strides[]{ 20 };
 	UINT offsets[]{ 0 };
-	ID3D11Buffer* cbuffers[]{ viewProjectionBuffer, m_pModelBuffer };
+	ID3D11Buffer* cbuffers[]{ viewProjectionBuffer, m_pModelBuffers[0]};
 	m_pDeviceContext->IASetVertexBuffers(0, 1, vertexBuffers, strides, offsets);
 	m_pDeviceContext->IASetInputLayout(m_pInputLayout);
 	m_pDeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	m_pDeviceContext->VSSetShader(m_pVertexShader, nullptr, 0);
+
 	m_pDeviceContext->VSSetConstantBuffers(0, 2, cbuffers);
 	m_pDeviceContext->PSSetShader(m_pPixelShader, nullptr, 0);
 	m_pDeviceContext->DrawIndexed(36, 0, 0);
+
+	for (int i{ 1 }; i < m_pModelBuffers.size(); ++i) {
+		ID3D11Buffer* cbuffersi[]{ m_pModelBuffers[i] };
+		m_pDeviceContext->VSSetConstantBuffers(1, 1, cbuffersi);
+		m_pDeviceContext->DrawIndexed(36, 0, 0);
+	}
 }
 
 float Cube::getModelRotationSpeed() {

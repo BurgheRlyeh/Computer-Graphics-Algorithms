@@ -13,14 +13,14 @@ class Cube {
 
     typedef struct ModelBuffer {
         DirectX::XMMATRIX m;
-    } CubeModelBuffer;
+    } ModelBuffer;
 
     ID3D11Device* m_pDevice{};
     ID3D11DeviceContext* m_pDeviceContext{};
 
     ID3D11Buffer*       m_pVertexBuffer{};
     ID3D11Buffer*       m_pIndexBuffer{};
-    ID3D11Buffer*       m_pModelBuffer{};
+    std::vector<ID3D11Buffer*> m_pModelBuffers{};
     ID3D11VertexShader* m_pVertexShader{};
     ID3D11PixelShader*  m_pPixelShader{};
     ID3D11InputLayout*  m_pInputLayout{};
@@ -29,7 +29,6 @@ class Cube {
     ID3D11ShaderResourceView* m_pTextureView{};
 
     float m_modelRotationSpeed{ DirectX::XM_PIDIV2 };
-    float m_angleRotationY{};
 
 public:
     Cube(ID3D11Device* device, ID3D11DeviceContext* deviceContext):
@@ -37,20 +36,10 @@ public:
         m_pDeviceContext(deviceContext)
     {}
 
-    ID3D11Buffer* getVertexBuffer();
-    ID3D11Buffer* getIndexBuffer();
-    ID3D11Buffer* getModelBuffer();
-    ID3D11VertexShader* getVertexShader();
-    ID3D11PixelShader* getPixelShader();
-    ID3D11InputLayout* getInputLayout();
-
-    ID3D11Texture2D* getTexture();
-    ID3D11ShaderResourceView* getTextureView();
-
-    HRESULT init();
+    HRESULT init(int num);
     void term();
 
-    void update(float angle);
+    void update(int idx, DirectX::XMMATRIX matrix);
     void render(ID3D11SamplerState* sampler, ID3D11Buffer* viewProjectionBuffer);
 
     float getModelRotationSpeed();
@@ -58,7 +47,7 @@ public:
 private:
     HRESULT createVertexBuffer(Vertex(&vertices)[], UINT numVertices);
     HRESULT createIndexBuffer(USHORT(&indices)[], UINT numIndices);
-    HRESULT createModelBuffer(CubeModelBuffer& modelBuffer);
+    HRESULT createModelBuffer(ModelBuffer& modelBuffer, int idx);
     HRESULT createTexture(TextureDesc& textureDesc);
     HRESULT createResourceView(TextureDesc& textureDesc);
 };
