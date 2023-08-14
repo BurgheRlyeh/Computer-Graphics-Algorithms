@@ -2,7 +2,7 @@
 
 #include "ShaderProcessor.h"
 
-HRESULT Cube::init(int num) {
+HRESULT Cube::init(DirectX::XMMATRIX* positions, int num) {
 	m_pModelBuffers.resize(num);
 
 	HRESULT hr{ S_OK };
@@ -141,7 +141,7 @@ HRESULT Cube::init(int num) {
 
 	// create model buffer
 	for (int idx{}; idx < num; ++idx) {
-		ModelBuffer modelBuffer{ DirectX::XMMatrixIdentity() };
+		ModelBuffer modelBuffer{ positions[idx] };
 
 		hr = createModelBuffer(modelBuffer, idx);
 		if (FAILED(hr)) {

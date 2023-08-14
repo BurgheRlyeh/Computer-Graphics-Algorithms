@@ -36,7 +36,7 @@ public:
         m_pDeviceContext(deviceContext)
     {}
 
-    HRESULT init(int num);
+    HRESULT init(DirectX::XMMATRIX* positions, int num);
     void term();
 
     void update(int idx, DirectX::XMMATRIX matrix);
