@@ -176,29 +176,29 @@ bool Renderer::init(HWND hWnd) {
     SAFE_RELEASE(adapter);
     SAFE_RELEASE(factory);
 
-    //{
-    //    // Setup Dear ImGui context
-    //    IMGUI_CHECKVERSION();
-    //    ImGui::CreateContext();
-    //    ImGuiIO& io = ImGui::GetIO(); (void)io;
-    //    //io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
-    //    //io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+    {
+        // Setup Dear ImGui context
+        IMGUI_CHECKVERSION();
+        ImGui::CreateContext();
+        ImGuiIO& io = ImGui::GetIO(); (void)io;
+        //io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+        //io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
 
-    //    // Setup Dear ImGui style
-    //    ImGui::StyleColorsDark();
-    //    //ImGui::StyleColorsLight();
+        // Setup Dear ImGui style
+        ImGui::StyleColorsDark();
+        //ImGui::StyleColorsLight();
 
-    //    // Setup Platform/Renderer backends
-    //    ImGui_ImplWin32_Init(hWnd);
-    //    ImGui_ImplDX11_Init(m_pDevice, m_pDeviceContext);
+        // Setup Platform/Renderer backends
+        ImGui_ImplWin32_Init(hWnd);
+        ImGui_ImplDX11_Init(m_pDevice, m_pDeviceContext);
 
-        /*m_sceneBuffer.lightCount.x = 1;
+        m_sceneBuffer.lightCount.x = 1;
         m_sceneBuffer.lights[0].pos = { 0, 1.05f, 0, 1 };
         m_sceneBuffer.lights[0].color = { 1,1,0,0 };
-        m_sceneBuffer.ambientCl = { 0, 0, 0.2f, 0 };*/
-    //}
+        m_sceneBuffer.ambientCl = { 0, 0, 0.2f, 0 };
+    }
 
-    m_isShowLights = true;
+    /*m_isShowLights = true;
 
     m_sceneBuffer.lightCount.x = 4;
     m_sceneBuffer.lights[0].pos = { 0.75f, 1.0f, 0.75f, 1.0f };
@@ -209,7 +209,7 @@ bool Renderer::init(HWND hWnd) {
     m_sceneBuffer.lights[2].color = { 1.0f, 1.0f, 0.0f, 0.0f };
     m_sceneBuffer.lights[3].pos = { 1.25f, 0.0f, 1.25f, 1.0f };
     m_sceneBuffer.lights[3].color = { 1.0f, 1.0f, 0.0f, 0.0f };
-    m_sceneBuffer.ambientCl = { 0.0f, 0.0f, 0.2f, 1.0f };
+    m_sceneBuffer.ambientCl = { 0.0f, 0.0f, 0.2f, 1.0f };*/
 
     if (FAILED(hr)) {
         term();
@@ -219,9 +219,9 @@ bool Renderer::init(HWND hWnd) {
 }
 
 void Renderer::term() {
-    /*ImGui_ImplDX11_Shutdown();
+    ImGui_ImplDX11_Shutdown();
     ImGui_ImplWin32_Shutdown();
-    ImGui::DestroyContext();*/
+    ImGui::DestroyContext();
 
     termScene();
     
@@ -536,8 +536,48 @@ bool Renderer::render() {
         cameraPos
     );
 
-    //m_sceneBuffer.lightCount.y = 1;
-    //m_sceneBuffer.lightCount.z = 1;
+    // Start the Dear ImGui frame
+    ImGui_ImplDX11_NewFrame();
+    ImGui_ImplWin32_NewFrame();
+    ImGui::NewFrame();
+
+    {
+        ImGui::Begin("Lights");
+
+        ImGui::Checkbox("Show bulbs", &m_isShowLights);
+        ImGui::Checkbox("Use normal maps", &m_isUseNormalMaps);
+        ImGui::Checkbox("Show normals", &m_isShowNormals);
+
+        m_sceneBuffer.lightCount.y = m_isUseNormalMaps ? 1 : 0;
+        m_sceneBuffer.lightCount.z = m_isShowNormals ? 1 : 0;
+
+        bool add = ImGui::Button("+");
+        ImGui::SameLine();
+        bool remove = ImGui::Button("-");
+
+        if (add && m_sceneBuffer.lightCount.x < 10) {
+            ++m_sceneBuffer.lightCount.x;
+            m_sceneBuffer.lights[m_sceneBuffer.lightCount.x - 1] = LightSphere::Light();
+        }
+        if (remove && m_sceneBuffer.lightCount.x > 0) {
+            --m_sceneBuffer.lightCount.x;
+        }
+
+        char buffer[1024];
+        for (int i = 0; i < m_sceneBuffer.lightCount.x; i++) {
+            ImGui::Text("Light %d", i);
+            sprintf_s(buffer, "Pos %d", i);
+            ImGui::DragFloat3(buffer, (float*)&m_sceneBuffer.lights[i].pos, 0.1f, -10.0f, 10.0f);
+            sprintf_s(buffer, "Color %d", i);
+            ImGui::ColorEdit3(buffer, (float*)&m_sceneBuffer.lights[i].color);
+        }
+
+        ImGui::End();
+    }
+
+    // Rendering
+    ImGui::Render();
+    ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
 
     return SUCCEEDED(m_pSwapChain->Present(0, 0));
 }

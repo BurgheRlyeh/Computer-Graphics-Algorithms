@@ -253,7 +253,7 @@ void Rect::render(
 
     std::sort(depthIdxPairs.begin(), depthIdxPairs.end());
 
-    for (int i{}; i < m_pModelBuffers.size(); ++i) {
+    for (int i{ static_cast<int>(m_pModelBuffers.size() - 1) }; 0 <= i; --i) {
         cbuffers[1] = m_pModelBuffers[depthIdxPairs[i].second];
         m_pDeviceContext->VSSetConstantBuffers(0, 2, cbuffers);
         m_pDeviceContext->PSSetConstantBuffers(0, 2, cbuffers);

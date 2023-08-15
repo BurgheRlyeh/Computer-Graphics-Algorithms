@@ -111,14 +111,14 @@ class Renderer {
 
 	Camera m_camera{};
 
-	bool m_isModelRotate{};
+	bool m_isModelRotate{ true };
 
 	size_t m_prevTime{};
 
 	SceneBuffer m_sceneBuffer{};
 
-	bool m_isShowLights{};
-	bool m_isUseNormalMaps{};
+	bool m_isShowLights{ true };
+	bool m_isUseNormalMaps{ true };
 	bool m_isShowNormals{};
 
 public:

@@ -22,9 +22,6 @@
     <Filter Include="Source Files\imgui">
       <UniqueIdentifier>{70bd27db-56c7-47ca-8cef-347dc27a221e}</UniqueIdentifier>
     </Filter>
-    <Filter Include="imgui">
-      <UniqueIdentifier>{1d91bdc8-660b-442d-8ea5-0f19372b8542}</UniqueIdentifier>
-    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="framework.h">
@@ -83,6 +80,12 @@
     </ClInclude>
     <ClInclude Include="..\Common\imgui\backends\imgui_impl_win32.h">
       <Filter>Header Files\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="Light.h">
+      <Filter>Shaders</Filter>
+    </ClInclude>
+    <ClInclude Include="SceneCB.h">
+      <Filter>Shaders</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
