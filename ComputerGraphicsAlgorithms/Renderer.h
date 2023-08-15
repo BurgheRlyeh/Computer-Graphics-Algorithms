@@ -12,18 +12,23 @@
 #include "Cube.h"
 #include "Sphere.h"
 #include "Rect.h"
+#include "LightSphere.h"
 
 #define _MATH_DEFINES_DEFINED
 
 class Cube;
 class Sphere;
 class Rect;
+class LightSphere;
 
 class Renderer {
-	typedef struct ViewProjectionBuffer {
-		DirectX::XMMATRIX vp;
-		DirectX::XMFLOAT4 cameraPos;
-	} ViewProjectionBuffer;
+	typedef struct SceneBuffer {
+		DirectX::XMMATRIX vp{};
+		DirectX::XMFLOAT4 cameraPos{};
+		DirectX::XMINT4 lightCount{};
+		LightSphere::Light lights[10]{};
+		DirectX::XMFLOAT4 ambientCl{};
+	} SceneBuffer;
 
 	typedef struct Camera {
 		DirectX::XMFLOAT3 poi; // point of interest
@@ -86,7 +91,9 @@ class Renderer {
 
 	Rect* m_pRect{};
 
-	ID3D11Buffer* m_pVPBuffer{};
+	LightSphere* m_pLightSphere{};
+
+	ID3D11Buffer* m_pSceneBuffer{};
 	ID3D11RasterizerState* m_pRasterizerState{};
 	ID3D11SamplerState* m_pSampler{};
 
@@ -107,6 +114,12 @@ class Renderer {
 	bool m_isModelRotate{};
 
 	size_t m_prevTime{};
+
+	SceneBuffer m_sceneBuffer{};
+
+	bool m_isShowLights{};
+	bool m_isUseNormalMaps{};
+	bool m_isShowNormals{};
 
 public:
 	MouseHandler m_mouseHandler;

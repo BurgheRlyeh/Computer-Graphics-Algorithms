@@ -6,13 +6,17 @@
 struct TextureDesc;
 
 class Cube {
-    typedef struct Vertex {
+    typedef struct TextureTangentVertex {
         DirectX::XMFLOAT3 point;
+        DirectX::XMFLOAT3 tangent;
+        DirectX::XMFLOAT3 norm;
         DirectX::XMFLOAT2 texture;
     } Vertex;
 
     typedef struct ModelBuffer {
-        DirectX::XMMATRIX m;
+        DirectX::XMMATRIX matrix;
+        DirectX::XMMATRIX normalMatrix;
+        DirectX::XMFLOAT4 shine; // bright like a diamond
     } ModelBuffer;
 
     ID3D11Device* m_pDevice{};
@@ -28,6 +32,9 @@ class Cube {
     ID3D11Texture2D* m_pTexture{};
     ID3D11ShaderResourceView* m_pTextureView{};
 
+    ID3D11Texture2D* m_pTextureNM{};
+    ID3D11ShaderResourceView* m_pTextureViewNM{};
+
     float m_modelRotationSpeed{ DirectX::XM_PIDIV2 };
 
 public:
@@ -39,7 +46,7 @@ public:
     HRESULT init(DirectX::XMMATRIX* positions, int num);
     void term();
 
-    void update(int idx, DirectX::XMMATRIX matrix);
+    void update(int idx, DirectX::XMMATRIX matrix, DirectX::XMMATRIX normalMatrix, DirectX::XMFLOAT4 shine);
     void render(ID3D11SamplerState* sampler, ID3D11Buffer* viewProjectionBuffer);
 
     float getModelRotationSpeed();
@@ -48,6 +55,6 @@ private:
     HRESULT createVertexBuffer(Vertex(&vertices)[], UINT numVertices);
     HRESULT createIndexBuffer(USHORT(&indices)[], UINT numIndices);
     HRESULT createModelBuffer(ModelBuffer& modelBuffer, int idx);
-    HRESULT createTexture(TextureDesc& textureDesc);
-    HRESULT createResourceView(TextureDesc& textureDesc);
+    HRESULT createTexture(TextureDesc& textureDesc, ID3D11Texture2D** texture);
+    HRESULT createResourceView(TextureDesc& textureDesc, ID3D11Texture2D* pTexture, ID3D11ShaderResourceView** pShaderResourceView);
 };

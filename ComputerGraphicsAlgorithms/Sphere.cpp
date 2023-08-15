@@ -102,6 +102,7 @@ HRESULT Sphere::init() {
 			m_pDevice,
 			L"SphereShader.vs",
 			reinterpret_cast<ID3D11DeviceChild**>(&m_pVertexShader),
+			{},
 			&sphereVertexShaderCode
 		);
 		if (FAILED(hr)) {

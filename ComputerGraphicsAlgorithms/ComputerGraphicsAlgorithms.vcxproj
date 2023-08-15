@@ -133,9 +133,18 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="..\Common\imgui\backends\imgui_impl_dx11.h" />
+    <ClInclude Include="..\Common\imgui\backends\imgui_impl_win32.h" />
+    <ClInclude Include="..\Common\imgui\imconfig.h" />
+    <ClInclude Include="..\Common\imgui\imgui.h" />
+    <ClInclude Include="..\Common\imgui\imgui_internal.h" />
+    <ClInclude Include="..\Common\imgui\imstb_rectpack.h" />
+    <ClInclude Include="..\Common\imgui\imstb_textedit.h" />
+    <ClInclude Include="..\Common\imgui\imstb_truetype.h" />
     <ClInclude Include="ComputerGraphicsAlgorithms.h" />
     <ClInclude Include="Cube.h" />
     <ClInclude Include="framework.h" />
+    <ClInclude Include="LightSphere.h" />
     <ClInclude Include="Rect.h" />
     <ClInclude Include="Renderer.h" />
     <ClInclude Include="Resource.h" />
@@ -145,8 +154,16 @@
     <ClInclude Include="Texture.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\Common\imgui\backends\imgui_impl_dx11.cpp" />
+    <ClCompile Include="..\Common\imgui\backends\imgui_impl_win32.cpp" />
+    <ClCompile Include="..\Common\imgui\imgui.cpp" />
+    <ClCompile Include="..\Common\imgui\imgui_demo.cpp" />
+    <ClCompile Include="..\Common\imgui\imgui_draw.cpp" />
+    <ClCompile Include="..\Common\imgui\imgui_tables.cpp" />
+    <ClCompile Include="..\Common\imgui\imgui_widgets.cpp" />
     <ClCompile Include="ComputerGraphicsAlgorithms.cpp" />
     <ClCompile Include="Cube.cpp" />
+    <ClCompile Include="LightSphere.cpp" />
     <ClCompile Include="Rect.cpp" />
     <ClCompile Include="Renderer.cpp" />
     <ClCompile Include="ShaderProcessor.cpp" />

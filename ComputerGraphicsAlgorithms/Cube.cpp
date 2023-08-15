@@ -11,35 +11,35 @@ HRESULT Cube::init(DirectX::XMMATRIX* positions, int num) {
 	{
 		Vertex vertices[24]{
 			// Bottom face
-			{ { -0.5, -0.5,  0.5 }, { 0, 1 } },
-			{ {  0.5, -0.5,  0.5 }, { 1, 1 } },
-			{ {  0.5, -0.5, -0.5 }, { 1, 0 } },
-			{ { -0.5, -0.5, -0.5 }, { 0, 0 } },
-			// Front face
-			{ { -0.5,  0.5, -0.5 }, { 0, 1 } },
-			{ {  0.5,  0.5, -0.5 }, { 1, 1 } },
-			{ {  0.5,  0.5,  0.5 }, { 1, 0 } },
-			{ { -0.5,  0.5,  0.5 }, { 0, 0 } },
+			{ { -0.5, -0.5,  0.5 }, {  1,  0,  0 }, {  0, -1,  0 }, { 0, 1 } },
+			{ {  0.5, -0.5,  0.5 }, {  1,  0,  0 }, {  0, -1,  0 }, { 1, 1 } },
+			{ {  0.5, -0.5, -0.5 }, {  1,  0,  0 }, {  0, -1,  0 }, { 1, 0 } },
+			{ { -0.5, -0.5, -0.5 }, {  1,  0,  0 }, {  0, -1,  0 }, { 0, 0 } },
+			// Front face 
+			{ { -0.5,  0.5, -0.5 }, {  1,  0,  0 }, {  0,  1,  0 }, { 0, 1 } },
+			{ {  0.5,  0.5, -0.5 }, {  1,  0,  0 }, {  0,  1,  0 }, { 1, 1 } },
+			{ {  0.5,  0.5,  0.5 }, {  1,  0,  0 }, {  0,  1,  0 }, { 1, 0 } },
+			{ { -0.5,  0.5,  0.5 }, {  1,  0,  0 }, {  0,  1,  0 }, { 0, 0 } },
 			// Top face
-			{ {  0.5, -0.5, -0.5 }, { 0, 1 } },
-			{ {  0.5, -0.5,  0.5 }, { 1, 1 } },
-			{ {  0.5,  0.5,  0.5 }, { 1, 0 } },
-			{ {  0.5,  0.5, -0.5 }, { 0, 0 } },
+			{ {  0.5, -0.5, -0.5 }, {  0,  0,  1 }, {  1,  0,  0 }, { 0, 1 } },
+			{ {  0.5, -0.5,  0.5 }, {  0,  0,  1 }, {  1,  0,  0 }, { 1, 1 } },
+			{ {  0.5,  0.5,  0.5 }, {  0,  0,  1 }, {  1,  0,  0 }, { 1, 0 } },
+			{ {  0.5,  0.5, -0.5 }, {  0,  0,  1 }, {  1,  0,  0 }, { 0, 0 } },
 			// Back face
-			{ { -0.5, -0.5,  0.5 }, { 0, 1 } },
-			{ { -0.5, -0.5, -0.5 }, { 1, 1 } },
-			{ { -0.5,  0.5, -0.5 }, { 1, 0 } },
-			{ { -0.5,  0.5,  0.5 }, { 0, 0 } },
+			{ { -0.5, -0.5,  0.5 }, {  0,  0, -1 }, { -1,  0,  0 }, { 0, 1 } },
+			{ { -0.5, -0.5, -0.5 }, {  0,  0, -1 }, { -1,  0,  0 }, { 1, 1 } },
+			{ { -0.5,  0.5, -0.5 }, {  0,  0, -1 }, { -1,  0,  0 }, { 1, 0 } },
+			{ { -0.5,  0.5,  0.5 }, {  0,  0, -1 }, { -1,  0,  0 }, { 0, 0 } },
 			// Right face
-			{ {  0.5, -0.5,  0.5 }, { 0, 1 } },
-			{ { -0.5, -0.5,  0.5 }, { 1, 1 } },
-			{ { -0.5,  0.5,  0.5 }, { 1, 0 } },
-			{ {  0.5,  0.5,  0.5 }, { 0, 0 } },
+			{ {  0.5, -0.5,  0.5 }, { -1,  0,  0 }, {  0,  0,  1 }, { 0, 1 } },
+			{ { -0.5, -0.5,  0.5 }, { -1,  0,  0 }, {  0,  0,  1 }, { 1, 1 } },
+			{ { -0.5,  0.5,  0.5 }, { -1,  0,  0 }, {  0,  0,  1 }, { 1, 0 } },
+			{ {  0.5,  0.5,  0.5 }, { -1,  0,  0 }, {  0,  0,  1 }, { 0, 0 } },
 			// Left face
-			{ { -0.5, -0.5, -0.5 }, { 0, 1 } },
-			{ {  0.5, -0.5, -0.5 }, { 1, 1 } },
-			{ {  0.5,  0.5, -0.5 }, { 1, 0 } },
-			{ { -0.5,  0.5, -0.5 }, { 0, 0 } }
+			{ { -0.5, -0.5, -0.5 }, {  1,  0,  0 }, {  0,  0, -1 }, { 0, 1 } },
+			{ {  0.5, -0.5, -0.5 }, {  1,  0,  0 }, {  0,  0, -1 }, { 1, 1 } },
+			{ {  0.5,  0.5, -0.5 }, {  1,  0,  0 }, {  0,  0, -1 }, { 1, 0 } },
+			{ { -0.5,  0.5, -0.5 }, {  1,  0,  0 }, {  0,  0, -1 }, { 0, 0 } }
 		};
 
 		hr = createVertexBuffer(vertices, sizeof(vertices) / sizeof(*vertices));
@@ -47,7 +47,7 @@ HRESULT Cube::init(DirectX::XMMATRIX* positions, int num) {
 			return hr;
 		}
 
-		hr = SetResourceName(m_pVertexBuffer, "VertexBuffer");
+		hr = SetResourceName(m_pVertexBuffer, "CubeVertexBuffer");
 		if (FAILED(hr)) {
 			return hr;
 		}
@@ -69,7 +69,7 @@ HRESULT Cube::init(DirectX::XMMATRIX* positions, int num) {
 			return hr;
 		}
 
-		hr = SetResourceName(m_pIndexBuffer, "IndexBuffer");
+		hr = SetResourceName(m_pIndexBuffer, "CubeIndexBuffer");
 		if (FAILED(hr)) {
 			return hr;
 		}
@@ -82,6 +82,7 @@ HRESULT Cube::init(DirectX::XMMATRIX* positions, int num) {
 			m_pDevice,
 			L"CubeShader.vs",
 			(ID3D11DeviceChild**)&m_pVertexShader,
+			{},
 			&vertexShaderCode
 		);
 		if (FAILED(hr)) {
@@ -101,29 +102,15 @@ HRESULT Cube::init(DirectX::XMMATRIX* positions, int num) {
 	// create input layout
 	{
 		D3D11_INPUT_ELEMENT_DESC InputDesc[]{
-			{ 
-				"POSITION",
-				0,
-				DXGI_FORMAT_R32G32B32_FLOAT,
-				0,
-				0,
-				D3D11_INPUT_PER_VERTEX_DATA,
-				0
-			},
-			{
-				"TEXCOORD",
-				0,
-				DXGI_FORMAT_R32G32_FLOAT,
-				0,
-				12,
-				D3D11_INPUT_PER_VERTEX_DATA,
-				0
-			}
+			{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+			{ "TANGENT", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+			{ "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 24, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+			{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 36, D3D11_INPUT_PER_VERTEX_DATA, 0 },
 		};
 
 		hr = m_pDevice->CreateInputLayout(
 			InputDesc,
-			2,
+			4,
 			vertexShaderCode->GetBufferPointer(),
 			vertexShaderCode->GetBufferSize(),
 			&m_pInputLayout
@@ -148,20 +135,21 @@ HRESULT Cube::init(DirectX::XMMATRIX* positions, int num) {
 			return hr;
 		}
 
-		hr = SetResourceName(m_pModelBuffers[idx], "GeomBuffer" + idx);
+		hr = SetResourceName(m_pModelBuffers[idx], "ModelBuffer" + idx);
 		if (FAILED(hr)) {
 			return hr;
 		}
 	}
 
-	// load texture
-	TextureDesc textureDesc{};
+	// load texture and create view 
 	{
-		const std::wstring textureName{ L"../Common/Kitty.dds" };
+		TextureDesc textureDesc{};
+
+		const std::wstring textureName{ L"../Common/Brick.dds" };
 
 		bool ddsRes{ LoadDDS(textureName.c_str(), textureDesc) };
 
-		hr = createTexture(textureDesc);
+		hr = createTexture(textureDesc, &m_pTexture);
 		if (FAILED(hr)) {
 			return hr;
 		}
@@ -170,16 +158,50 @@ HRESULT Cube::init(DirectX::XMMATRIX* positions, int num) {
 		if (FAILED(hr)) {
 			return hr;
 		}
-	}
 
-	// create view
-	{
-		hr = createResourceView(textureDesc);
+		hr = createResourceView(textureDesc, m_pTexture, &m_pTextureView);
 		if (FAILED(hr)) {
 			return hr;
 		}
+
+		hr = SetResourceName(m_pTexture, "CubeTextureView");
+		if (FAILED(hr)) {
+			return hr;
+		}
+
+		free(textureDesc.pData);
 	}
-	free(textureDesc.pData);
+
+	// load texture and create view for normal map
+	{
+		TextureDesc textureDesc{};
+
+		const std::wstring textureName{ L"../Common/BrickNM.dds" };
+
+		bool ddsRes{ LoadDDS(textureName.c_str(), textureDesc) };
+
+		hr = createTexture(textureDesc, &m_pTextureNM);
+		if (FAILED(hr)) {
+			return hr;
+		}
+
+		hr = SetResourceName(m_pTextureNM, WCSToMBS(textureName));
+		if (FAILED(hr)) {
+			return hr;
+		}
+
+		hr = createResourceView(textureDesc, m_pTextureNM, &m_pTextureViewNM);
+		if (FAILED(hr)) {
+			return hr;
+		}
+
+		hr = SetResourceName(m_pTexture, "CubeTextureViewNM");
+		if (FAILED(hr)) {
+			return hr;
+		}
+
+		free(textureDesc.pData);
+	}
 
 	return hr;
 }
@@ -229,7 +251,7 @@ HRESULT Cube::createModelBuffer(ModelBuffer& modelBuffer, int idx) {
 	return m_pDevice->CreateBuffer(&desc, &data, &m_pModelBuffers[idx]);
 }
 
-HRESULT Cube::createTexture(TextureDesc& textureDesc) {
+HRESULT Cube::createTexture(TextureDesc& textureDesc, ID3D11Texture2D** texture) {
 	D3D11_TEXTURE2D_DESC desc{
 		// размеры в текселях
 		textureDesc.width, textureDesc.height,
@@ -240,20 +262,12 @@ HRESULT Cube::createTexture(TextureDesc& textureDesc) {
 	};
 
 	// размеры текстуры в блоках
-	UINT32 blockWidth{
-		static_cast<UINT32>(std::ceil(desc.Width / 4))
-	};
-	UINT32 blockHeight{
-		static_cast<UINT32>(std::ceil(desc.Height / 4))
-	};
+	UINT32 blockWidth{ static_cast<UINT32>(std::ceil(desc.Width / 4)) };
+	UINT32 blockHeight{ static_cast<UINT32>(std::ceil(desc.Height / 4)) };
 
 	// размер строки пикселей в байтах
-	UINT32 pitch{
-		blockWidth * GetBytesPerBlock(desc.Format)
-	};
-	const char* src{
-		reinterpret_cast<const char*>(textureDesc.pData)
-	};
+	UINT32 pitch{ blockWidth * GetBytesPerBlock(desc.Format) };
+	const char* src{ reinterpret_cast<const char*>(textureDesc.pData) };
 
 	// расчет mip уровней
 	std::vector<D3D11_SUBRESOURCE_DATA> data;
@@ -270,10 +284,10 @@ HRESULT Cube::createTexture(TextureDesc& textureDesc) {
 	}
 
 	// создание текстуры
-	return m_pDevice->CreateTexture2D(&desc, data.data(), &m_pTexture);
+	return m_pDevice->CreateTexture2D(&desc, data.data(), texture);
 }
 
-HRESULT Cube::createResourceView(TextureDesc& textureDesc) {
+HRESULT Cube::createResourceView(TextureDesc& textureDesc, ID3D11Texture2D* pTexture, ID3D11ShaderResourceView** ppSRView) {
 	// resource view для обработки в шейдерах
 	D3D11_SHADER_RESOURCE_VIEW_DESC desc{
 		.Format{ textureDesc.fmt },
@@ -284,7 +298,7 @@ HRESULT Cube::createResourceView(TextureDesc& textureDesc) {
 		}
 	};
 
-	return m_pDevice->CreateShaderResourceView(m_pTexture, &desc, &m_pTextureView);
+	return m_pDevice->CreateShaderResourceView(pTexture, &desc, ppSRView);
 }
 
 void Cube::term() {
@@ -299,10 +313,22 @@ void Cube::term() {
 
 	SAFE_RELEASE(m_pTexture);
 	SAFE_RELEASE(m_pTextureView);
+
+	SAFE_RELEASE(m_pTextureNM);
+	SAFE_RELEASE(m_pTextureViewNM);
 }
 
-void Cube::update(int idx, DirectX::XMMATRIX matrix) {
-	ModelBuffer modelBuffer{ matrix };
+void Cube::update(
+	int idx,
+	DirectX::XMMATRIX matrix,
+	DirectX::XMMATRIX normalMatrix,
+	DirectX::XMFLOAT4 shine
+) {
+	ModelBuffer modelBuffer{
+		matrix,
+		normalMatrix,
+		shine
+	};
 
 	// обновление буфера
 	m_pDeviceContext->UpdateSubresource(m_pModelBuffers[idx], 0, nullptr, &modelBuffer, 0, 0);
@@ -312,26 +338,30 @@ void Cube::render(ID3D11SamplerState* sampler, ID3D11Buffer* viewProjectionBuffe
 	ID3D11SamplerState* samplers[]{ sampler };
 	m_pDeviceContext->PSSetSamplers(0, 1, samplers);
 
-	ID3D11ShaderResourceView* resources[]{ m_pTextureView };
-	m_pDeviceContext->PSSetShaderResources(0, 1, resources);
+	ID3D11ShaderResourceView* resources[]{ m_pTextureView, m_pTextureViewNM };
+	m_pDeviceContext->PSSetShaderResources(0, 2, resources);
 
 	m_pDeviceContext->IASetIndexBuffer(m_pIndexBuffer, DXGI_FORMAT_R16_UINT, 0);
+
 	ID3D11Buffer* vertexBuffers[]{ m_pVertexBuffer };
-	UINT strides[]{ 20 };
+	UINT strides[]{ 44 };
 	UINT offsets[]{ 0 };
-	ID3D11Buffer* cbuffers[]{ viewProjectionBuffer, m_pModelBuffers[0]};
 	m_pDeviceContext->IASetVertexBuffers(0, 1, vertexBuffers, strides, offsets);
 	m_pDeviceContext->IASetInputLayout(m_pInputLayout);
 	m_pDeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	m_pDeviceContext->VSSetShader(m_pVertexShader, nullptr, 0);
 
+	ID3D11Buffer* cbuffers[]{ viewProjectionBuffer, m_pModelBuffers[0] };
 	m_pDeviceContext->VSSetConstantBuffers(0, 2, cbuffers);
+	m_pDeviceContext->PSSetConstantBuffers(0, 2, cbuffers);
+
 	m_pDeviceContext->PSSetShader(m_pPixelShader, nullptr, 0);
 	m_pDeviceContext->DrawIndexed(36, 0, 0);
 
 	for (int i{ 1 }; i < m_pModelBuffers.size(); ++i) {
 		ID3D11Buffer* cbuffersi[]{ m_pModelBuffers[i] };
 		m_pDeviceContext->VSSetConstantBuffers(1, 1, cbuffersi);
+		m_pDeviceContext->PSSetConstantBuffers(1, 1, cbuffersi);
 		m_pDeviceContext->DrawIndexed(36, 0, 0);
 	}
 }

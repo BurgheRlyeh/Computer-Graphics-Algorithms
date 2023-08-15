@@ -53,6 +53,7 @@ HRESULT Rect::init(DirectX::XMFLOAT3* positions, DirectX::XMFLOAT4* colors, int 
             m_pDevice,
             L"TransColor.vs",
             (ID3D11DeviceChild**)&m_pVertexShader,
+            {},
             &vertexShaderCode
         );
         if (FAILED(hr)) {
@@ -62,7 +63,8 @@ HRESULT Rect::init(DirectX::XMFLOAT3* positions, DirectX::XMFLOAT4* colors, int 
         hr = compileAndCreateShader(
             m_pDevice,
             L"TransColor.ps",
-            (ID3D11DeviceChild**)&m_pPixelShader
+            (ID3D11DeviceChild**)&m_pPixelShader,
+            { "USE_LIGHTS" }
         );
         if (FAILED(hr)) {
             return hr;

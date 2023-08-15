@@ -1,9 +1,49 @@
 #include "ShaderProcessor.h"
 
+class D3DInclude : public ID3DInclude {
+	STDMETHOD(Open)(THIS_ D3D_INCLUDE_TYPE IncludeType, LPCSTR pFileName, LPCVOID pParentData, LPCVOID* ppData, UINT* pBytes) {
+		FILE* pFile = nullptr;
+		fopen_s(&pFile, pFileName, "rb");
+		assert(pFile != nullptr);
+		if (pFile == nullptr) {
+			return E_FAIL;
+		}
+
+		fseek(pFile, 0, SEEK_END);
+		long long size = _ftelli64(pFile);
+		fseek(pFile, 0, SEEK_SET);
+
+		VOID* pData = malloc(size);
+		if (pData == nullptr) {
+			fclose(pFile);
+			return E_FAIL;
+		}
+
+		size_t rd = fread(pData, 1, size, pFile);
+		assert(rd == (size_t)size);
+
+		if (rd != (size_t)size) {
+			fclose(pFile);
+			free(pData);
+			return E_FAIL;
+		}
+
+		*ppData = pData;
+		*pBytes = (UINT)size;
+
+		return S_OK;
+	}
+	STDMETHOD(Close)(THIS_ LPCVOID pData) {
+		free(const_cast<void*>(pData));
+		return S_OK;
+	}
+};
+
 HRESULT compileAndCreateShader(
 	ID3D11Device* device,
 	const std::wstring& path,
 	ID3D11DeviceChild** ppShader,
+	const std::vector<std::string>& defines,
 	ID3DBlob** ppCode
 ) {
 	// Try to load shader's source code first
@@ -37,6 +77,17 @@ HRESULT compileAndCreateShader(
 	flags |= D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
 #endif // _DEBUG
 
+	D3DInclude includeHandler;
+
+	std::vector<D3D_SHADER_MACRO> shaderDefines;
+	shaderDefines.resize(defines.size() + 1);
+	for (int i = 0; i < defines.size(); i++) {
+		shaderDefines[i].Name = defines[i].c_str();
+		shaderDefines[i].Definition = "";
+	}
+	shaderDefines.back().Name = nullptr;
+	shaderDefines.back().Definition = nullptr;
+
 	// Try to compile
 	ID3DBlob* pCode{};
 	ID3DBlob* pErrMsg{};
@@ -44,8 +95,8 @@ HRESULT compileAndCreateShader(
 		data.data(),
 		data.size(),
 		WCSToMBS(path).c_str(),
-		nullptr,
-		nullptr,
+		shaderDefines.data(),
+		&includeHandler,
 		entryPoint.c_str(),
 		platform.c_str(),
 		flags,

@@ -2,6 +2,10 @@
 #include "Renderer.h"
 #include "Texture.h"
 
+#include "../Common/imgui/imgui.h"
+#include "../Common/imgui/backends/imgui_impl_dx11.h"
+#include "../Common/imgui/backends/imgui_impl_win32.h"
+
 void Renderer::Camera::move(float delta) {
     DirectX::XMFLOAT3 cf, cr;
     getDirections(cf, cr);
@@ -96,6 +100,16 @@ void Renderer::KeyboardHandler::keyPressed(int keyCode) {
         case 'a':
             renderer.m_camera.rightDelta += panSpeed;
             break;
+
+        case 'M':
+        case 'm':
+            renderer.m_sceneBuffer.lightCount.y = !renderer.m_sceneBuffer.lightCount.y;
+            break;
+
+        case 'N':
+        case 'n':
+            renderer.m_sceneBuffer.lightCount.z = !renderer.m_sceneBuffer.lightCount.z;
+            break;
     }
 }
 
@@ -162,6 +176,41 @@ bool Renderer::init(HWND hWnd) {
     SAFE_RELEASE(adapter);
     SAFE_RELEASE(factory);
 
+    //{
+    //    // Setup Dear ImGui context
+    //    IMGUI_CHECKVERSION();
+    //    ImGui::CreateContext();
+    //    ImGuiIO& io = ImGui::GetIO(); (void)io;
+    //    //io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+    //    //io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+
+    //    // Setup Dear ImGui style
+    //    ImGui::StyleColorsDark();
+    //    //ImGui::StyleColorsLight();
+
+    //    // Setup Platform/Renderer backends
+    //    ImGui_ImplWin32_Init(hWnd);
+    //    ImGui_ImplDX11_Init(m_pDevice, m_pDeviceContext);
+
+        /*m_sceneBuffer.lightCount.x = 1;
+        m_sceneBuffer.lights[0].pos = { 0, 1.05f, 0, 1 };
+        m_sceneBuffer.lights[0].color = { 1,1,0,0 };
+        m_sceneBuffer.ambientCl = { 0, 0, 0.2f, 0 };*/
+    //}
+
+    m_isShowLights = true;
+
+    m_sceneBuffer.lightCount.x = 4;
+    m_sceneBuffer.lights[0].pos = { 0.75f, 1.0f, 0.75f, 1.0f };
+    m_sceneBuffer.lights[0].color = { 1.0f, 1.0f, 0.0f, 0.0f };
+    m_sceneBuffer.lights[1].pos = { -0.75f, 0.0f, -0.75f, 1.0f };
+    m_sceneBuffer.lights[1].color = { 1.0f, 1.0f, 0.0f, 0.0f };
+    m_sceneBuffer.lights[2].pos = { 2.75f, 1.0f, -0.75f, 1.0f };
+    m_sceneBuffer.lights[2].color = { 1.0f, 1.0f, 0.0f, 0.0f };
+    m_sceneBuffer.lights[3].pos = { 1.25f, 0.0f, 1.25f, 1.0f };
+    m_sceneBuffer.lights[3].color = { 1.0f, 1.0f, 0.0f, 0.0f };
+    m_sceneBuffer.ambientCl = { 0.0f, 0.0f, 0.2f, 1.0f };
+
     if (FAILED(hr)) {
         term();
     }
@@ -170,6 +219,12 @@ bool Renderer::init(HWND hWnd) {
 }
 
 void Renderer::term() {
+    /*ImGui_ImplDX11_Shutdown();
+    ImGui_ImplWin32_Shutdown();
+    ImGui::DestroyContext();*/
+
+    termScene();
+    
     SAFE_RELEASE(m_pBackBufferRTV);
     SAFE_RELEASE(m_pSwapChain);
     SAFE_RELEASE(m_pDeviceContext);
@@ -318,21 +373,38 @@ bool Renderer::update() {
 
         m_cubeAngleRotation += m_pCube->getModelRotationSpeed() * (time - m_prevTime) / 1e6f;
 
-        m_pCube->update(
-            0,
+
+        DirectX::XMMATRIX matrix0{
             // матрица вращения вокруг оси
             DirectX::XMMatrixRotationAxis(
                 // вектор, описывающий ось вращения
                 DirectX::XMVectorSet(0.0f, 1.0f, 0.0f, 1.0f),
                 m_cubeAngleRotation
             )
+        };
+        DirectX::XMMATRIX normalMatrix0{
+            DirectX::XMMatrixTranspose(
+                DirectX::XMMatrixInverse(nullptr, matrix0)
+            )
+        };
+
+        m_pCube->update(
+            0,
+            matrix0,
+            normalMatrix0,
+            DirectX::XMFLOAT4()
         );
 
         m_pCube->update(
             1,
-            DirectX::XMMatrixTranslation(2.0f, 0.0f, 0.0f)
+            DirectX::XMMatrixTranslation(2.0f, 0.0f, 0.0f),
+            DirectX::XMMatrixIdentity(),
+            DirectX::XMFLOAT4(64.0f, 0.0f, 0.0f, 0.0f)
         );
     }
+
+    // Move light bulb spheres
+    m_pLightSphere->update(m_sceneBuffer.lights, m_sceneBuffer.lightCount.x);
 
     m_prevTime = time;
 
@@ -387,7 +459,7 @@ bool Renderer::update() {
 
     D3D11_MAPPED_SUBRESOURCE subresource;
     HRESULT hr = m_pDeviceContext->Map(
-        m_pVPBuffer, // указатель на ресурс
+        m_pSceneBuffer, // указатель на ресурс
         0, // номер
         D3D11_MAP_WRITE_DISCARD, // не сохраняем предыдущее значение
         0, &subresource
@@ -396,10 +468,12 @@ bool Renderer::update() {
         return false;
     }
 
-    ViewProjectionBuffer& sceneBuffer = *reinterpret_cast<ViewProjectionBuffer*>(subresource.pData);
-    sceneBuffer.vp = DirectX::XMMatrixMultiply(v, p);
-    sceneBuffer.cameraPos = DirectX::XMFLOAT4(cameraPos.x, cameraPos.y, cameraPos.z, 0.0f);
-    m_pDeviceContext->Unmap(this->m_pVPBuffer, 0);
+    //ViewProjectionBuffer& sceneBuffer = *reinterpret_cast<ViewProjectionBuffer*>(subresource.pData);
+    m_sceneBuffer.vp = DirectX::XMMatrixMultiply(v, p);
+    m_sceneBuffer.cameraPos = DirectX::XMFLOAT4(cameraPos.x, cameraPos.y, cameraPos.z, 0.0f);
+    memcpy(subresource.pData, &m_sceneBuffer, sizeof(SceneBuffer));
+    
+    m_pDeviceContext->Unmap(m_pSceneBuffer, 0);
 
     return SUCCEEDED(hr);
 }
@@ -440,9 +514,13 @@ bool Renderer::render() {
 
     m_pDeviceContext->OMSetBlendState(m_pOpaqueBlendState, nullptr, 0xFFFFFFFF);
 
-    m_pSphere->render(m_pSampler, m_pVPBuffer);
+    m_pCube->render(m_pSampler, m_pSceneBuffer);
 
-    m_pCube->render(m_pSampler, m_pVPBuffer);
+    if (m_isShowLights) {
+        m_pLightSphere->render(m_pSceneBuffer, m_pDepthState, m_pOpaqueBlendState, m_sceneBuffer.lightCount.x);
+    }
+
+    m_pSphere->render(m_pSampler, m_pSceneBuffer);
 
     DirectX::XMFLOAT3 cameraPos{
         m_camera.poi.x + m_camera.r * cosf(m_camera.angY) * cosf(m_camera.angZ),
@@ -452,11 +530,14 @@ bool Renderer::render() {
 
     m_pRect->render(
         m_pSampler,
-        m_pVPBuffer,
+        m_pSceneBuffer,
         m_pTransDepthState,
         m_pTransBlendState,
         cameraPos
     );
+
+    //m_sceneBuffer.lightCount.y = 1;
+    //m_sceneBuffer.lightCount.z = 1;
 
     return SUCCEEDED(m_pSwapChain->Present(0, 0));
 }
@@ -541,7 +622,7 @@ HRESULT Renderer::initScene() {
             return hr;
         }
 
-        hr = SetResourceName(m_pVPBuffer, "SceneBuffer");
+        hr = SetResourceName(m_pSceneBuffer, "SceneBuffer");
         if (FAILED(hr)) {
             return hr;
         }
@@ -659,17 +740,23 @@ HRESULT Renderer::initScene() {
     };
 
     DirectX::XMFLOAT4 rectColors[]{
-        { 1.0f, 0.25f, 0.0f, 1.0f },
-        { 0.0f, 0.25f, 1.0f, 1.0f }
+        { 1.0f, 0.25f, 0.0f, 0.5f },
+        { 0.0f, 0.25f, 1.0f, 0.5f }
     };
 
     hr = m_pRect->init(rectPositions, rectColors, 2);
+
+    m_pLightSphere = new LightSphere(m_pDevice, m_pDeviceContext);
+    hr = m_pLightSphere->init();
+    if (FAILED(hr)) {
+        return hr;
+    }
 
     return hr;
 }
 
 void Renderer::termScene() {
-    SAFE_RELEASE(m_pVPBuffer);
+    SAFE_RELEASE(m_pSceneBuffer);
     SAFE_RELEASE(m_pRasterizerState);
     SAFE_RELEASE(m_pSampler);
 
@@ -688,13 +775,13 @@ void Renderer::termScene() {
 
 HRESULT Renderer::createViewProjectionBuffer() {
     D3D11_BUFFER_DESC desc{
-        .ByteWidth{ sizeof(ViewProjectionBuffer) },
+        .ByteWidth{ sizeof(SceneBuffer) },
         .Usage{ D3D11_USAGE_DYNAMIC },	// часто собираемся обновлять, храним ближе к CPU
         .BindFlags{ D3D11_BIND_CONSTANT_BUFFER },
         .CPUAccessFlags{ D3D11_CPU_ACCESS_WRITE }	// можем писать со стороны CPU  
     };
 
-    return m_pDevice->CreateBuffer(&desc, nullptr, &m_pVPBuffer);
+    return m_pDevice->CreateBuffer(&desc, nullptr, &m_pSceneBuffer);
 }
 
 HRESULT Renderer::createRasterizerState() {
