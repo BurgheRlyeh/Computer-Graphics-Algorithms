@@ -193,23 +193,10 @@ bool Renderer::init(HWND hWnd) {
         ImGui_ImplDX11_Init(m_pDevice, m_pDeviceContext);
 
         m_sceneBuffer.lightCount.x = 1;
-        m_sceneBuffer.lights[0].pos = { 0, 1.05f, 0, 1 };
-        m_sceneBuffer.lights[0].color = { 1,1,0,0 };
-        m_sceneBuffer.ambientCl = { 0, 0, 0.2f, 0 };
+        m_sceneBuffer.lights[0].pos = { 1.1f, 1.0f, 0.0f, 1.0f };
+        m_sceneBuffer.lights[0].color = { 1.0f, 1.0f, 0.0f, 0.0f };
+        m_sceneBuffer.ambientColor = { 0.15f, 0.15f, 0.15f, 1.0f };
     }
-
-    /*m_isShowLights = true;
-
-    m_sceneBuffer.lightCount.x = 4;
-    m_sceneBuffer.lights[0].pos = { 0.75f, 1.0f, 0.75f, 1.0f };
-    m_sceneBuffer.lights[0].color = { 1.0f, 1.0f, 0.0f, 0.0f };
-    m_sceneBuffer.lights[1].pos = { -0.75f, 0.0f, -0.75f, 1.0f };
-    m_sceneBuffer.lights[1].color = { 1.0f, 1.0f, 0.0f, 0.0f };
-    m_sceneBuffer.lights[2].pos = { 2.75f, 1.0f, -0.75f, 1.0f };
-    m_sceneBuffer.lights[2].color = { 1.0f, 1.0f, 0.0f, 0.0f };
-    m_sceneBuffer.lights[3].pos = { 1.25f, 0.0f, 1.25f, 1.0f };
-    m_sceneBuffer.lights[3].color = { 1.0f, 1.0f, 0.0f, 0.0f };
-    m_sceneBuffer.ambientCl = { 0.0f, 0.0f, 0.2f, 1.0f };*/
 
     if (FAILED(hr)) {
         term();
@@ -547,9 +534,11 @@ bool Renderer::render() {
         ImGui::Checkbox("Show bulbs", &m_isShowLights);
         ImGui::Checkbox("Use normal maps", &m_isUseNormalMaps);
         ImGui::Checkbox("Show normals", &m_isShowNormals);
+        ImGui::Checkbox("Use ambient light", &m_isUseAmbient);
 
         m_sceneBuffer.lightCount.y = m_isUseNormalMaps ? 1 : 0;
         m_sceneBuffer.lightCount.z = m_isShowNormals ? 1 : 0;
+        m_sceneBuffer.lightCount.w = m_isUseAmbient ? 1 : 0;
 
         bool add = ImGui::Button("+");
         ImGui::SameLine();

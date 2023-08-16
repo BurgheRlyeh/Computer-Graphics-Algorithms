@@ -27,7 +27,7 @@ class Renderer {
 		DirectX::XMFLOAT4 cameraPos{};
 		DirectX::XMINT4 lightCount{};
 		LightSphere::Light lights[10]{};
-		DirectX::XMFLOAT4 ambientCl{};
+		DirectX::XMFLOAT4 ambientColor{};
 	} SceneBuffer;
 
 	typedef struct Camera {
@@ -120,6 +120,7 @@ class Renderer {
 	bool m_isShowLights{ true };
 	bool m_isUseNormalMaps{ true };
 	bool m_isShowNormals{};
+	bool m_isUseAmbient{ true };
 
 public:
 	MouseHandler m_mouseHandler;

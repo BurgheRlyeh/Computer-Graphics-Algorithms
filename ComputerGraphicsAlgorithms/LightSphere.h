@@ -21,12 +21,12 @@ class LightSphere {
 	ID3D11InputLayout* m_pInputLayout{};
 
 public:
-	typedef struct Light {
-		DirectX::XMFLOAT4 pos{};
-		DirectX::XMFLOAT4 color{
-			1.0f, 1.0f, 1.0f, 0.0f
-		};
-	} Light;
+typedef struct Light {
+	DirectX::XMFLOAT4 pos{};
+	DirectX::XMFLOAT4 color{
+		1.0f, 1.0f, 1.0f, 0.0f
+	};
+} Light;
 
 	LightSphere() = delete;
 	LightSphere(ID3D11Device* device, ID3D11DeviceContext* deviceContext):

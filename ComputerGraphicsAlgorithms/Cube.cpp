@@ -334,8 +334,8 @@ void Cube::update(
 	m_pDeviceContext->UpdateSubresource(m_pModelBuffers[idx], 0, nullptr, &modelBuffer, 0, 0);
 }
 
-void Cube::render(ID3D11SamplerState* sampler, ID3D11Buffer* viewProjectionBuffer) {
-	ID3D11SamplerState* samplers[]{ sampler };
+void Cube::render(ID3D11SamplerState* pSampler, ID3D11Buffer* pSceneBuffer) {
+	ID3D11SamplerState* samplers[]{ pSampler };
 	m_pDeviceContext->PSSetSamplers(0, 1, samplers);
 
 	ID3D11ShaderResourceView* resources[]{ m_pTextureView, m_pTextureViewNM };
@@ -351,7 +351,7 @@ void Cube::render(ID3D11SamplerState* sampler, ID3D11Buffer* viewProjectionBuffe
 	m_pDeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	m_pDeviceContext->VSSetShader(m_pVertexShader, nullptr, 0);
 
-	ID3D11Buffer* cbuffers[]{ viewProjectionBuffer, m_pModelBuffers[0] };
+	ID3D11Buffer* cbuffers[]{ pSceneBuffer, m_pModelBuffers[0] };
 	m_pDeviceContext->VSSetConstantBuffers(0, 2, cbuffers);
 	m_pDeviceContext->PSSetConstantBuffers(0, 2, cbuffers);
 
