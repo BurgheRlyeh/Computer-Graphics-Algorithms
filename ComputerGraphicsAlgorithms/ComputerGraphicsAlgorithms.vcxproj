@@ -141,6 +141,8 @@
     <ClInclude Include="..\Common\imgui\imstb_rectpack.h" />
     <ClInclude Include="..\Common\imgui\imstb_textedit.h" />
     <ClInclude Include="..\Common\imgui\imstb_truetype.h" />
+    <ClInclude Include="AABB.h" />
+    <ClInclude Include="Camera.h" />
     <ClInclude Include="ComputerGraphicsAlgorithms.h" />
     <ClInclude Include="Cube.h" />
     <ClInclude Include="framework.h" />
@@ -163,6 +165,7 @@
     <ClCompile Include="..\Common\imgui\imgui_draw.cpp" />
     <ClCompile Include="..\Common\imgui\imgui_tables.cpp" />
     <ClCompile Include="..\Common\imgui\imgui_widgets.cpp" />
+    <ClCompile Include="Camera.cpp" />
     <ClCompile Include="ComputerGraphicsAlgorithms.cpp" />
     <ClCompile Include="Cube.cpp" />
     <ClCompile Include="LightSphere.cpp" />
@@ -192,6 +195,7 @@
     <None Include="CubeShader.vs">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
       </ExcludedFromBuild>
+      <FileType>Document</FileType>
     </None>
     <None Include="TransColor.ps" />
     <None Include="TransColor.vs" />

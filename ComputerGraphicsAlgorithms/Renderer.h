@@ -13,6 +13,8 @@
 #include "Sphere.h"
 #include "Rect.h"
 #include "LightSphere.h"
+#include "Camera.h"
+#include "AABB.h"
 
 #define _MATH_DEFINES_DEFINED
 
@@ -20,6 +22,8 @@ class Cube;
 class Sphere;
 class Rect;
 class LightSphere;
+struct Camera;
+struct AABB;
 
 class Renderer {
 	typedef struct SceneBuffer {
@@ -30,27 +34,32 @@ class Renderer {
 		DirectX::XMFLOAT4 ambientColor{};
 	} SceneBuffer;
 
-	typedef struct Camera {
-		DirectX::XMFLOAT3 poi; // point of interest
-		float r;    // distance to POI
-		float angZ;    // angle in plane x0z (left-right)
-		float angY; // angle from plane x0z (up-down)
+	//typedef struct Camera {
+	//	DirectX::XMFLOAT3 poi; // point of interest
+	//	float r;    // distance to POI
+	//	float angZ;    // angle in plane x0z (left-right)
+	//	float angY; // angle from plane x0z (up-down)
 
-		float cameraRotationSpeed{ DirectX::XM_2PI };
+	//	float cameraRotationSpeed{ DirectX::XM_2PI };
 
-		float forwardDelta{};
-		float rightDelta{};
+	//	float forwardDelta{};
+	//	float rightDelta{};
 
-		void move(float delta);
-		void getDirections(DirectX::XMFLOAT3& forward, DirectX::XMFLOAT3& right);
-	} Camera;
+	//	void move(float delta);
+	//	void getDirections(
+	//		DirectX::XMFLOAT3& forward,
+	//		DirectX::XMFLOAT3& right
+	//	);
+	//} Camera;
 
 	typedef struct MouseHandler {
 		Renderer& renderer;
+		Camera& camera;
 
 		MouseHandler() = delete;
-		MouseHandler(Renderer& renderer):
-			renderer(renderer)
+		MouseHandler(Renderer& renderer, Camera& camera):
+			renderer(renderer),
+			camera(camera)
 		{}
 
 		bool isMRBPressed{};
@@ -64,10 +73,12 @@ class Renderer {
 
 	typedef struct KeyboardHandler {
 		Renderer& renderer;
+		Camera& camera;
 
 		KeyboardHandler() = delete;
-		KeyboardHandler(Renderer& renderer):
-			renderer(renderer)
+		KeyboardHandler(Renderer& renderer, Camera& camera):
+			renderer(renderer),
+			camera(camera)
 		{}
 
 	private:
@@ -83,6 +94,8 @@ class Renderer {
 
 	IDXGISwapChain* m_pSwapChain{};
 	ID3D11RenderTargetView* m_pBackBufferRTV{};
+
+	Camera m_camera{};
 
 	Cube* m_pCube{};
 	float m_cubeAngleRotation{};
@@ -109,7 +122,7 @@ class Renderer {
 	UINT m_width{ 16 };
 	UINT m_height{ 16 };
 
-	Camera m_camera{};
+	//Camera m_camera{};
 
 	bool m_isModelRotate{ true };
 
@@ -127,8 +140,8 @@ public:
 	KeyboardHandler m_keyboardHandler;
 
 	Renderer():
-		m_mouseHandler(*this),
-		m_keyboardHandler(*this)
+		m_mouseHandler(*this, m_camera),
+		m_keyboardHandler(*this, m_camera)
 	{}
 
 	bool init(HWND hWnd);
@@ -152,4 +165,6 @@ private:
 	HRESULT createRasterizerState();
 	HRESULT createReversedDepthState();
 	HRESULT createSampler();
+
+	void cullBoxes();
 };

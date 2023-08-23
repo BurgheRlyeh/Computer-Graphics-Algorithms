@@ -109,3 +109,7 @@ inline UINT32 GetBytesPerBlock(const DXGI_FORMAT& fmt) {
     assert(0);
     return 0;
 }
+
+inline float randNormf() {
+    return (float)rand() / RAND_MAX;
+}

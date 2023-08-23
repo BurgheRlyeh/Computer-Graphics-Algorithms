@@ -2,6 +2,9 @@
 
 #include "framework.h"
 #include "Texture.h"
+#include "AABB.h"
+
+struct AABB;
 
 class Rect {
 	typedef struct Vertex {
@@ -18,6 +21,9 @@ class Rect {
 		DirectX::XMFLOAT3 v[4];
 	} BoundingRect;
 
+
+	AABB m_boundingRects[2]{};
+
 	ID3D11Device* m_pDevice{};
 	ID3D11DeviceContext* m_pDeviceContext{};
 
@@ -25,7 +31,7 @@ class Rect {
 	ID3D11Buffer* m_pIndexBuffer{};
 
 	std::vector<ID3D11Buffer*> m_pModelBuffers{};
-	std::vector<BoundingRect> m_boundingRects{};
+	//std::vector<BoundingRect> m_boundingRects{};
 
 	ID3D11VertexShader* m_pVertexShader{};
 	ID3D11PixelShader* m_pPixelShader{};
