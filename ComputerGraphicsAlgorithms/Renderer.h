@@ -16,6 +16,8 @@
 #include "Camera.h"
 #include "AABB.h"
 
+#include "SimpleMath.h"
+
 #define _MATH_DEFINES_DEFINED
 
 class Cube;
@@ -27,30 +29,12 @@ struct AABB;
 
 class Renderer {
 	typedef struct SceneBuffer {
-		DirectX::XMMATRIX vp{};
-		DirectX::XMFLOAT4 cameraPos{};
+		DirectX::SimpleMath::Matrix vp{};
+		DirectX::SimpleMath::Vector4 cameraPos{};
 		DirectX::XMINT4 lightCount{};
 		LightSphere::Light lights[10]{};
-		DirectX::XMFLOAT4 ambientColor{};
+		DirectX::SimpleMath::Color ambientColor{};
 	} SceneBuffer;
-
-	//typedef struct Camera {
-	//	DirectX::XMFLOAT3 poi; // point of interest
-	//	float r;    // distance to POI
-	//	float angZ;    // angle in plane x0z (left-right)
-	//	float angY; // angle from plane x0z (up-down)
-
-	//	float cameraRotationSpeed{ DirectX::XM_2PI };
-
-	//	float forwardDelta{};
-	//	float rightDelta{};
-
-	//	void move(float delta);
-	//	void getDirections(
-	//		DirectX::XMFLOAT3& forward,
-	//		DirectX::XMFLOAT3& right
-	//	);
-	//} Camera;
 
 	typedef struct MouseHandler {
 		Renderer& renderer;
@@ -110,14 +94,14 @@ class Renderer {
 	ID3D11RasterizerState* m_pRasterizerState{};
 	ID3D11SamplerState* m_pSampler{};
 
-	ID3D11Texture2D* m_pDepthBuffer;
-	ID3D11DepthStencilView* m_pDepthBufferDSV;
+	ID3D11Texture2D* m_pDepthBuffer{};
+	ID3D11DepthStencilView* m_pDepthBufferDSV{};
 
-	ID3D11DepthStencilState* m_pDepthState;
-	ID3D11DepthStencilState* m_pTransDepthState;
+	ID3D11DepthStencilState* m_pDepthState{};
+	ID3D11DepthStencilState* m_pTransDepthState{};
 
-	ID3D11BlendState* m_pTransBlendState;
-	ID3D11BlendState* m_pOpaqueBlendState;
+	ID3D11BlendState* m_pTransBlendState{};
+	ID3D11BlendState* m_pOpaqueBlendState{};
 
 	UINT m_width{ 16 };
 	UINT m_height{ 16 };

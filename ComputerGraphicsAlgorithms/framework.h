@@ -5,10 +5,13 @@
 #pragma once
 
 #include "targetver.h"
+
 #define WIN32_LEAN_AND_MEAN             // Exclude rarely-used stuff from Windows headers
+
 // Windows Header Files
 #include <windows.h>
 #include <windowsx.h>
+
 // C RunTime Header Files
 #include <stdlib.h>
 #include <malloc.h>
@@ -16,9 +19,12 @@
 #include <tchar.h>
 #include <assert.h>
 
+// C++ RunTime Header Files
+#include <exception>
 #include <string>
 #include <vector>
 
+// DirectX 
 #pragma comment(lib, "dxgi.lib")
 #pragma comment(lib, "d3d11.lib")
 #pragma comment(lib, "dxguid.lib")
@@ -30,6 +36,9 @@
 #include <d3dcompiler.h>
 
 #include <DirectXMath.h>
+
+// DirectXToolKit
+#include "SimpleMath.h"
 
 #define ASSERT_RETURN(expr, returnValue) \
 {\
@@ -48,6 +57,12 @@
         p->Release();\
         p = nullptr;\
     }\
+}
+
+inline void ThrowIfFailed(HRESULT hr) {
+    if (FAILED(hr)) {
+        throw std::exception();
+    }
 }
 
 inline HRESULT SetResourceName(ID3D11DeviceChild* pResource, const std::string& name) {

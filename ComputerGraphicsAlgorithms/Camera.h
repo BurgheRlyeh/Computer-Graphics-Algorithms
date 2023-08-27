@@ -3,23 +3,23 @@
 #include "framework.h"
 
 struct Camera {
-	DirectX::XMFLOAT3 poi{};
+	DirectX::SimpleMath::Vector3 poi{};
 	float r{};
 	float angZ{};
 	float angY{};
 
 	float rotationSpeed{ DirectX::XM_2PI };
 
-	float forwardDelta{};
-	float rightDelta{};
+	float dForward{};
+	float dRight{};
 
 	void move(float delta);
 
-	DirectX::XMFLOAT3 getDir();
-	DirectX::XMFLOAT3 getUp();
-	DirectX::XMFLOAT3 getForward();
-	DirectX::XMFLOAT3 getRight();
+	DirectX::SimpleMath::Vector3 getDir(float shift = 0.f);
+	DirectX::SimpleMath::Vector3 getUp();
+	DirectX::SimpleMath::Vector3 getForward();
+	DirectX::SimpleMath::Vector3 getRight();
 
-	void getDirections(DirectX::XMFLOAT3& forward, DirectX::XMFLOAT3& right);
-	DirectX::XMFLOAT3 getPosition();
+	void getDirections(DirectX::SimpleMath::Vector3& forward, DirectX::SimpleMath::Vector3& right);
+	DirectX::SimpleMath::Vector3 getPosition();
 };

@@ -1,105 +1,53 @@
 #include "Camera.h"
 
 using namespace DirectX;
+using namespace DirectX::SimpleMath;
 
 void Camera::move(float delta) {
-    DirectX::XMFLOAT3 cf, cr;
-    getDirections(cf, cr);
-    poi = {
-        poi.x + delta * (cf.x * forwardDelta + cr.x * rightDelta),
-        poi.y + delta * (cf.y * forwardDelta + cr.y * rightDelta),
-        poi.z + delta * (cf.z * forwardDelta + cr.z * rightDelta)
-    };
+    Vector3 forward, right;
+    getDirections(forward, right);
+    poi += delta * (forward * dForward + right * dRight);
 }
 
-DirectX::XMFLOAT3 Camera::getDir() {
+Vector3 Camera::getDir(float shift) {
     return {
-        cosf(angY) * cosf(angZ),
-        sinf(angY),
-        cosf(angY) * sinf(angZ)
+        cosf(angY + shift) * cosf(angZ),
+        sinf(angY + shift),
+        cosf(angY + shift) * sinf(angZ)
     };
 }
 
-DirectX::XMFLOAT3 Camera::getUp() {
-    return {
-        cosf(angY + DirectX::XM_PIDIV2) * cosf(angZ),
-        sinf(angY + DirectX::XM_PIDIV2),
-        cosf(angY + DirectX::XM_PIDIV2) * sinf(angZ)
-    };
+Vector3 Camera::getUp() {
+    return getDir(XM_PIDIV2);
 }
 
-void Camera::getDirections(DirectX::XMFLOAT3& forward, DirectX::XMFLOAT3& right) {
+void Camera::getDirections(Vector3& forward, Vector3& right) {
     auto dir{ getDir() };
     auto up{ getUp() };
 
-    auto dirVector{ DirectX::XMLoadFloat3(&dir) };
-    auto upVector{ DirectX::XMLoadFloat3(&up) };
+    forward = XMMax(fabs(dir.x), fabs(dir.y)) <= 1e-5f ? up : dir;
+    forward.y = 0.f;
+    forward.Normalize();
 
-    auto forwardVector{
-        DirectX::XMMax(
-            fabs(DirectX::XMVectorGetX(dirVector)),
-            fabs(DirectX::XMVectorGetZ(dirVector))
-        ) <= 1e-5f ? upVector : dirVector
-    };
-    DirectX::XMVectorSetY(forwardVector, 0.0f);
-    DirectX::XMVector3Normalize(forwardVector);
-    DirectX::XMStoreFloat3(&forward, forwardVector);
-
-
-    auto rightVector{ DirectX::XMVector3Cross(upVector, dirVector) };
-    DirectX::XMVectorSetY(rightVector, 0.0f);
-    DirectX::XMVector3Normalize(rightVector);
-    DirectX::XMStoreFloat3(&right, rightVector);
+    right = up.Cross(dir);
+    right.y = 0.f;
+    right.Normalize();
 }
 
-DirectX::XMFLOAT3 Camera::getForward() {
+Vector3 Camera::getForward() {
     auto dir{ getDir() };
-    auto up{ getUp() };
 
-    auto dirVector{ DirectX::XMLoadFloat3(&dir) };
-    auto upVector{ DirectX::XMLoadFloat3(&up) };
-
-    auto forwardVector{
-        DirectX::XMMax(
-            fabs(DirectX::XMVectorGetX(dirVector)),
-            fabs(DirectX::XMVectorGetZ(dirVector))
-        ) <= 1e-5f ? upVector : dirVector
-    };
-    DirectX::XMVectorSetY(forwardVector, 0.0f);
-    DirectX::XMVector3Normalize(forwardVector);
-
-    DirectX::XMFLOAT3 forward{};
-    DirectX::XMStoreFloat3(&forward, forwardVector);
+    auto forward{ XMMax(fabs(dir.x), fabs(dir.z)) <= 1e-5f ? getUp() : dir };
+    forward.y = 0;
+    forward.Normalize();
 
     return forward;
 }
 
-DirectX::XMFLOAT3 Camera::getRight() {
-    auto dir{ getDir() };
-    auto up{ getUp() };
-
-    auto dirVector{ DirectX::XMLoadFloat3(&dir) };
-    auto upVector{ DirectX::XMLoadFloat3(&up) };
-
-    auto rightVector{ DirectX::XMVector3Cross(upVector, dirVector) };
-    //DirectX::XMVectorScale(rightVector, -1.0f);
-
-    DirectX::XMFLOAT3 right{};
-    DirectX::XMStoreFloat3(&right, rightVector);
-
-    //return right;
-    return {
-        - right.x,
-        - right.y,
-        - right.z
-    };
+Vector3 Camera::getRight() {
+    return -getUp().Cross(getDir());
 }
 
-DirectX::XMFLOAT3 Camera::getPosition() {
-    auto dir{ getDir() };
-    return {
-        poi.x + r * dir.x,
-        poi.y + r * dir.y,
-        poi.z + r * dir.z
-    };
+Vector3 Camera::getPosition() {
+    return poi + r * getDir();
 }

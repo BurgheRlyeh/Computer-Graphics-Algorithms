@@ -6,6 +6,9 @@
 #include "../Common/imgui/backends/imgui_impl_dx11.h"
 #include "../Common/imgui/backends/imgui_impl_win32.h"
 
+using namespace DirectX;
+using namespace DirectX::SimpleMath;
+
 void Renderer::MouseHandler::mouseRBPressed(bool isPressed, int x, int y) {
 	isMRBPressed = isPressed;
 	if (!isMRBPressed) {
@@ -22,16 +25,16 @@ void Renderer::MouseHandler::mouseMoved(int x, int y) {
 	}
 
 	camera.angZ -= camera.rotationSpeed * (x - prevMouseX) / renderer.m_width;
-	camera.angY += camera.rotationSpeed * (y - prevMouseY) / renderer.m_width;
-	camera.angY = DirectX::XMMax(camera.angY, -DirectX::XM_PIDIV2);
-	camera.angY = DirectX::XMMin(camera.angY, DirectX::XM_PIDIV2);
+	camera.angY += camera.rotationSpeed * (y - prevMouseY) / renderer.m_height;
+	camera.angY = XMMax(camera.angY, 0.1f - XM_PIDIV2);
+	camera.angY = XMMin(camera.angY, XM_PIDIV2 - 0.1f);
 
 	prevMouseX = x;
 	prevMouseY = y;
 }
 
 void Renderer::MouseHandler::mouseWheel(int delta) {
-	camera.r = DirectX::XMMax(camera.r - delta / 100.0f, 1.0f);
+	camera.r = XMMax(camera.r - delta / 100.0f, 1.0f);
 }
 
 void Renderer::KeyboardHandler::keyPressed(int keyCode) {
@@ -42,22 +45,22 @@ void Renderer::KeyboardHandler::keyPressed(int keyCode) {
 
 		case 'W':
 		case 'w':
-			camera.forwardDelta -= panSpeed;
+			camera.dForward -= panSpeed;
 			break;
 
 		case 'S':
 		case 's':
-			camera.forwardDelta += panSpeed;
+			camera.dForward += panSpeed;
 			break;
 
 		case 'D':
 		case 'd':
-			camera.rightDelta -= panSpeed;
+			camera.dRight -= panSpeed;
 			break;
 
 		case 'A':
 		case 'a':
-			camera.rightDelta += panSpeed;
+			camera.dRight += panSpeed;
 			break;
 	}
 }
@@ -66,22 +69,22 @@ void Renderer::KeyboardHandler::keyReleased(int keyCode) {
 	switch (keyCode) {
 		case 'W':
 		case 'w':
-			renderer.m_camera.forwardDelta += panSpeed;
+			renderer.m_camera.dForward += panSpeed;
 			break;
 
 		case 'S':
 		case 's':
-			renderer.m_camera.forwardDelta -= panSpeed;
+			renderer.m_camera.dForward -= panSpeed;
 			break;
 
 		case 'D':
 		case 'd':
-			renderer.m_camera.rightDelta += panSpeed;
+			renderer.m_camera.dRight += panSpeed;
 			break;
 
 		case 'A':
 		case 'a':
-			renderer.m_camera.rightDelta -= panSpeed;
+			renderer.m_camera.dRight -= panSpeed;
 			break;
 	}
 }
@@ -92,33 +95,25 @@ bool Renderer::init(HWND hWnd) {
 	// Create a DirectX graphics interface factory.
 	IDXGIFactory* factory{};
 	hr = CreateDXGIFactory(__uuidof(IDXGIFactory), (void**)&factory);
-	if (FAILED(hr)) {
-		return false;
-	}
+	ThrowIfFailed(hr);
 
 	IDXGIAdapter* adapter{ selectIDXGIAdapter(factory) };
 	assert(adapter);
 
 	hr = createDeviceAndSwapChain(hWnd, adapter);
-	if (FAILED(hr)) {
-		return false;
-	}
+	ThrowIfFailed(hr);
 
 	hr = setupBackBuffer();
-	if (FAILED(hr)) {
-		return false;
-	}
+	ThrowIfFailed(hr);
 
 	hr = initScene();
-	if (FAILED(hr)) {
-		return false;
-	}
+	ThrowIfFailed(hr);
 
 	// initial camera setup
 	m_camera = Camera{
-		.r{ 5.0f },
-		.angZ{ -DirectX::XM_PI / 2 },
-		.angY{ DirectX::XM_PI / 4 },
+		.r{ 5.f },
+		.angZ{ -XM_PI / 2 },
+		.angY{  XM_PI / 4 },
 	};
 
 	SAFE_RELEASE(adapter);
@@ -165,9 +160,8 @@ void Renderer::term() {
 	if (m_pDevice) {
 		ID3D11Debug* debug{};
 		HRESULT hr{ m_pDevice->QueryInterface(__uuidof(ID3D11Debug), (void**)&debug) };
-		if (FAILED(hr)) {
-			return;
-		}
+		ThrowIfFailed(hr);
+
 		if (debug->AddRef() != 3) {
 			debug->ReportLiveDeviceObjects(D3D11_RLDO_DETAIL | D3D11_RLDO_IGNORE_INTERNAL);
 		}
@@ -264,24 +258,20 @@ bool Renderer::resize(UINT width, UINT height) {
 	SAFE_RELEASE(m_pDepthBufferDSV);
 
 	HRESULT hr{ m_pSwapChain->ResizeBuffers(2, width, height, DXGI_FORMAT_R8G8B8A8_UNORM, 0) };
-	if (FAILED(hr)) {
-		return false;
-	}
+	ThrowIfFailed(hr);
 
 	this->m_width = width;
 	this->m_height = height;
 
 	hr = setupBackBuffer();
-	if (FAILED(hr)) {
-		return false;
-	}
+	ThrowIfFailed(hr);
 
 	// setup skybox sphere
 	float n{ 0.1f };
-	float fov{ DirectX::XM_PI / 3 };
+	float fov{ XM_PI / 3 };
 	float halfW{ n * tanf(fov / 2) };
 	float halfH{ static_cast<float>(height / width * halfW) };
-
+	
 	float r{ 1.1f * 2.0f * sqrtf(n * n + halfH * halfH + halfW * halfW) };
 
 	m_pSphere->resize(r);
@@ -301,55 +291,30 @@ bool Renderer::update() {
 	// move camera
 	m_camera.move((time - m_prevTime) / 1e6f);
 
-	m_pCube->update((time - m_prevTime) / 1e6, m_isModelRotate);
+	m_pCube->update((time - m_prevTime) / 1e6f, m_isModelRotate);
 
 	// Move light bulb spheres
 	m_pLightSphere->update(m_sceneBuffer.lights, m_sceneBuffer.lightCount.x);
 
 	m_prevTime = time;
 
-	DirectX::XMFLOAT3 cameraPos{
-		m_camera.poi.x + m_camera.r * cosf(m_camera.angY) * cosf(m_camera.angZ),
-			m_camera.poi.y + m_camera.r * sinf(m_camera.angY),
-			m_camera.poi.z + m_camera.r * cosf(m_camera.angY) * sinf(m_camera.angZ)
-	};
+	Vector3 cameraPos{ m_camera.getPosition() };
 
 	// Setup camera
-	DirectX::XMMATRIX v{
-		// создание матрицы для системы координат левой руки
-		DirectX::XMMatrixLookAtLH(
-			// позиция камеры
-			DirectX::XMVectorSet(
-				cameraPos.x,
-				cameraPos.y,
-				cameraPos.z,
-				0.0f
-			),
-			// позиция точки фокуса
-			DirectX::XMVectorSet(
-				m_camera.poi.x,
-				m_camera.poi.y,
-				m_camera.poi.z,
-				0.0f
-			),
-			// направление вверх от камеры
-			DirectX::XMVectorSet(
-				cosf(m_camera.angY + DirectX::XM_PIDIV2)* cosf(m_camera.angZ),
-				sinf(m_camera.angY + DirectX::XM_PIDIV2),
-				cosf(m_camera.angY + DirectX::XM_PIDIV2)* sinf(m_camera.angZ),
-				0.0f
-			)
-		)
-	};
+	Matrix v{ XMMatrixLookAtLH(
+		m_camera.getPosition(),
+		m_camera.poi,
+		m_camera.getUp()
+	) };
 
 	float nearPlane{ 0.1f };
 	float farPlane{ 100.0f };
-	float fov{ DirectX::XM_PI / 3 };
+	float fov{ XM_PI / 3 };
 	float aspectRatio{ static_cast<float>(m_height) / m_width };
 
-	DirectX::XMMATRIX p{
+	Matrix p{
 		// Матрица построения перспективы для левой руки
-		DirectX::XMMatrixPerspectiveLH(
+		XMMatrixPerspectiveLH(
 			2 * farPlane * tanf(fov / 2), // width
 			2 * farPlane * tanf(fov / 2) * aspectRatio,	// height
 			farPlane, // rho to near
@@ -364,13 +329,11 @@ bool Renderer::update() {
 		D3D11_MAP_WRITE_DISCARD, // не сохраняем предыдущее значение
 		0, &subresource
 	);
-	if (FAILED(hr)) {
-		return false;
-	}
+	ThrowIfFailed(hr);
 
 	//ViewProjectionBuffer& sceneBuffer = *reinterpret_cast<ViewProjectionBuffer*>(subresource.pData);
-	m_sceneBuffer.vp = DirectX::XMMatrixMultiply(v, p);
-	m_sceneBuffer.cameraPos = DirectX::XMFLOAT4(cameraPos.x, cameraPos.y, cameraPos.z, 0.0f);
+	m_sceneBuffer.vp = v * p;
+	m_sceneBuffer.cameraPos = { cameraPos.x, cameraPos.y, cameraPos.z, 0.0f };
 	memcpy(subresource.pData, &m_sceneBuffer, sizeof(SceneBuffer));
 
 	m_pDeviceContext->Unmap(m_pSceneBuffer, 0);
@@ -424,18 +387,12 @@ bool Renderer::render() {
 
 	m_pSphere->render(m_pSampler, m_pSceneBuffer);
 
-	DirectX::XMFLOAT3 cameraPos{
-		m_camera.poi.x + m_camera.r * cosf(m_camera.angY) * cosf(m_camera.angZ),
-			m_camera.poi.y + m_camera.r * sinf(m_camera.angY),
-			m_camera.poi.z + m_camera.r * cosf(m_camera.angY) * sinf(m_camera.angZ)
-	};
-
 	m_pRect->render(
 		m_pSampler,
 		m_pSceneBuffer,
 		m_pTransDepthState,
 		m_pTransBlendState,
-		cameraPos
+		m_camera.getPosition()
 	);
 
 	// Start the Dear ImGui frame
@@ -460,8 +417,7 @@ bool Renderer::render() {
 		bool remove = ImGui::Button("-");
 
 		if (add && m_sceneBuffer.lightCount.x < 10) {
-			++m_sceneBuffer.lightCount.x;
-			m_sceneBuffer.lights[m_sceneBuffer.lightCount.x - 1] = LightSphere::Light();
+			m_sceneBuffer.lights[++m_sceneBuffer.lightCount.x - 1] = LightSphere::Light();
 		}
 		if (remove && m_sceneBuffer.lightCount.x > 0) {
 			--m_sceneBuffer.lightCount.x;
@@ -490,41 +446,26 @@ bool Renderer::render() {
 
 HRESULT Renderer::setupBackBuffer() {
 	ID3D11Texture2D* backBuffer{};
-	HRESULT hr{ m_pSwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID*)&backBuffer) };
-	if (FAILED(hr)) {
-		return hr;
-	}
+	HRESULT hr{ S_OK };
+
+	hr = m_pSwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID*)&backBuffer);
+	ThrowIfFailed(hr);
 
 	hr = m_pDevice->CreateRenderTargetView(backBuffer, nullptr, &m_pBackBufferRTV);
 	SAFE_RELEASE(backBuffer);
-	if (FAILED(hr)) {
-		return hr;
-	}
+	ThrowIfFailed(hr);
 
 	hr = createDepthBuffer();
-	if (FAILED(hr)) {
-		return hr;
-	}
+	ThrowIfFailed(hr);
 
 	hr = SetResourceName(m_pDepthBuffer, "DepthBuffer");
-	if (FAILED(hr)) {
-		return hr;
-	}
+	ThrowIfFailed(hr);
 
-	hr = m_pDevice->CreateDepthStencilView(
-		m_pDepthBuffer,
-		nullptr,
-		&m_pDepthBufferDSV
-	);
-	if (FAILED(hr)) {
-		return hr;
-	}
+	hr = m_pDevice->CreateDepthStencilView(m_pDepthBuffer, nullptr, &m_pDepthBufferDSV);
+	ThrowIfFailed(hr);
 
 	hr = SetResourceName(m_pDepthBufferDSV, "DepthBufferView");
-	if (FAILED(hr)) {
-		return hr;
-	}
-
+	ThrowIfFailed(hr);
 
 	return hr;
 }
@@ -551,40 +492,30 @@ HRESULT Renderer::initScene() {
 
 	m_pCube = new Cube(m_pDevice, m_pDeviceContext);
 
-	DirectX::XMMATRIX positions[]{
-		DirectX::XMMatrixIdentity(),
-		DirectX::XMMatrixTranslation(2.0f, 0.0f, 0.0f)
+	Matrix positions[]{
+		XMMatrixIdentity(),
+		XMMatrixTranslation(2.0f, 0.0f, 0.0f)
 	};
 
 	hr = m_pCube->init(positions, 2);
-	if (FAILED(hr)) {
-		return hr;
-	}
+	ThrowIfFailed(hr);
 
 	// create view-projection buffer
 	{
 		hr = createViewProjectionBuffer();
-		if (FAILED(hr)) {
-			return hr;
-		}
+		ThrowIfFailed(hr);
 
 		hr = SetResourceName(m_pSceneBuffer, "SceneBuffer");
-		if (FAILED(hr)) {
-			return hr;
-		}
+		ThrowIfFailed(hr);
 	}
 
 	// No culling rasterizer state
 	{
 		hr = createRasterizerState();
-		if (FAILED(hr)) {
-			return hr;
-		}
+		ThrowIfFailed(hr);
 
 		hr = SetResourceName(m_pRasterizerState, "RasterizerState");
-		if (FAILED(hr)) {
-			return hr;
-		}
+		ThrowIfFailed(hr);
 	}
 
 	// create blend states
@@ -610,38 +541,26 @@ HRESULT Renderer::initScene() {
 		};
 
 		hr = m_pDevice->CreateBlendState(&desc, &m_pTransBlendState);
-		if (FAILED(hr)) {
-			return hr;
-		}
+		ThrowIfFailed(hr);
 
 		hr = SetResourceName(m_pTransBlendState, "TransBlendState");
-		if (FAILED(hr)) {
-			return hr;
-		}
+		ThrowIfFailed(hr);
 
 		desc.RenderTarget[0].BlendEnable = FALSE;
 		hr = m_pDevice->CreateBlendState(&desc, &m_pOpaqueBlendState);
-		if (FAILED(hr)) {
-			return hr;
-		}
+		ThrowIfFailed(hr);
 
 		hr = SetResourceName(m_pOpaqueBlendState, "OpaqueBlendState");
-		if (FAILED(hr)) {
-			return hr;
-		}
+		ThrowIfFailed(hr);
 	}
 
 	// create reverse depth state
 	{
 		hr = createReversedDepthState();
-		if (FAILED(hr)) {
-			return hr;
-		}
+		ThrowIfFailed(hr);
 
 		hr = SetResourceName(m_pDepthState, "DephtState");
-		if (FAILED(hr)) {
-			return hr;
-		}
+		ThrowIfFailed(hr);
 	}
 
 	// create reverse transparent depth state
@@ -654,49 +573,37 @@ HRESULT Renderer::initScene() {
 		};
 
 		hr = m_pDevice->CreateDepthStencilState(&desc, &m_pTransDepthState);
-		if (FAILED(hr)) {
-			return hr;
-		}
+		ThrowIfFailed(hr);
 
 		hr = SetResourceName(m_pTransDepthState, "TransDepthState");
-		if (FAILED(hr)) {
-			return hr;
-		}
+		ThrowIfFailed(hr);
 	}
 
 	// create sampler
 	{
 		hr = createSampler();
-		if (FAILED(hr)) {
-			return hr;
-		}
+		ThrowIfFailed(hr);
 	}
 
 	m_pSphere = new Sphere(m_pDevice, m_pDeviceContext);
 	hr = m_pSphere->init();
-	if (FAILED(hr)) {
-		return hr;
-	}
+	ThrowIfFailed(hr);
 
 	m_pRect = new Rect(m_pDevice, m_pDeviceContext);
 
-	DirectX::XMFLOAT3 rectPositions[]{
+	Vector3 rectPositions[]{
 		{ 1.0f, 0, 0.0f },
 		{ 1.2f, 0, 0.0f }
 	};
-
-	DirectX::XMFLOAT4 rectColors[]{
+	Vector4 rectColors[]{
 		{ 1.0f, 0.25f, 0.0f, 0.5f },
 		{ 0.0f, 0.25f, 1.0f, 0.5f }
 	};
-
 	hr = m_pRect->init(rectPositions, rectColors, 2);
 
 	m_pLightSphere = new LightSphere(m_pDevice, m_pDeviceContext);
 	hr = m_pLightSphere->init();
-	if (FAILED(hr)) {
-		return hr;
-	}
+	ThrowIfFailed(hr);
 
 	return hr;
 }

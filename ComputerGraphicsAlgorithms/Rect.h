@@ -8,17 +8,17 @@ struct AABB;
 
 class Rect {
 	typedef struct Vertex {
-		DirectX::XMFLOAT3 point;
+		DirectX::SimpleMath::Vector3 point;
 		COLORREF color;
 	} Vertex;
 
 	typedef struct ModelBuffer {
-		DirectX::XMMATRIX matrix;
+		DirectX::SimpleMath::Matrix matrix;
 		DirectX::XMFLOAT4 color;
 	};
 
 	typedef struct BoundingRect {
-		DirectX::XMFLOAT3 v[4];
+		DirectX::SimpleMath::Vector3 v[4];
 	} BoundingRect;
 
 
@@ -42,16 +42,16 @@ public:
 		m_pDevice(device),
 		m_pDeviceContext(deviceContext) {}
 
-	HRESULT init(DirectX::XMFLOAT3* positions, DirectX::XMFLOAT4* colors, int num);
+	HRESULT init(DirectX::SimpleMath::Vector3* positions, DirectX::SimpleMath::Vector4* colors, int num);
 	void term();
 
-	void update(DirectX::XMMATRIX matrix);
+	void update(DirectX::SimpleMath::Matrix matrix);
 	void render(
 		ID3D11SamplerState* sampler,
 		ID3D11Buffer* viewProjectionBuffer,
 		ID3D11DepthStencilState* m_pTransDepthState,
 		ID3D11BlendState* m_pTransBlendState,
-		DirectX::XMFLOAT3 cameraPos
+		DirectX::SimpleMath::Vector3 cameraPos
 	);
 
 private:

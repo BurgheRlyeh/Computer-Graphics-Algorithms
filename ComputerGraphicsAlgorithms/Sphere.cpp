@@ -2,31 +2,28 @@
 
 #include "ShaderProcessor.h"
 
+using namespace DirectX;
+using namespace DirectX::SimpleMath;
+
 namespace {
 	void getSphereDataSize(size_t latCells, size_t lonCells, size_t& vertexCount, size_t& indexCount) {
 		vertexCount = (latCells + 1) * (lonCells + 1);
 		indexCount = latCells * lonCells * 6;
 	}
-	void initSphereVertex(
-		DirectX::XMFLOAT3* vertices,
-		size_t lat, size_t latCells,
-		size_t lon, size_t lonCells
-	) {
-		float latAngle{ DirectX::XM_PI * lat / latCells - DirectX::XM_PIDIV2 };
-		float lonAngle{ DirectX::XM_2PI * lon / lonCells + DirectX::XM_PI };
-		DirectX::XMFLOAT3 r{
-			sinf(lonAngle)* cosf(latAngle) / 2,
-			sinf(latAngle) / 2,
-			cosf(lonAngle)* cosf(latAngle) / 2,
+
+	void initSphereVertex(Vector3* vertices, size_t lat, size_t latCells, size_t lon, size_t lonCells) {
+		float latAngle{ XM_PI * lat / latCells - XM_PIDIV2 };
+		float lonAngle{ XM_2PI * lon / lonCells + XM_PI };
+		Vector3 r{
+			sinf(lonAngle) * cosf(latAngle),
+			sinf(latAngle),
+			cosf(lonAngle) * cosf(latAngle),
 		};
 
-		vertices[static_cast<int>(lat * (lonCells + 1) + lon)] = r;
+		vertices[static_cast<int>(lat * (lonCells + 1) + lon)] = r / 2;
 	}
-	void initSphereVertexIndices(
-		UINT16* indices,
-		size_t lat, size_t latCells,
-		size_t lon, size_t lonCells
-	) {
+
+	void initSphereVertexIndices(UINT16* indices, size_t lat, size_t latCells, size_t lon, size_t lonCells) {
 		size_t index = 6 * (lat * lonCells + lon);
 
 		indices[index + 0] = static_cast<UINT16>(lat * (latCells + 1) + lon + 0);
@@ -37,7 +34,8 @@ namespace {
 		indices[index + 5] = static_cast<UINT16>(lat * (latCells + 1) + lon + 1 + latCells + 1);
 		indices[index + 4] = static_cast<UINT16>(lat * (latCells + 1) + lon + 1 + latCells);
 	}
-	void createSphere(size_t latCells, size_t lonCells, DirectX::XMFLOAT3* vertices, UINT16* indices) {
+
+	void createSphere(size_t latCells, size_t lonCells, Vector3* vertices, UINT16* indices) {
 		for (size_t lat{}; lat < latCells + 1; ++lat) {
 			for (size_t lon{}; lon < lonCells + 1; ++lon) {
 				initSphereVertex(vertices, lat, latCells, lon, lonCells);
@@ -54,7 +52,7 @@ HRESULT Sphere::init() {
 
 	size_t sphereSteps{ 32 };
 
-	std::vector<DirectX::XMFLOAT3> vertices;
+	std::vector<Vector3> vertices;
 	std::vector<UINT16> indices;
 
 	size_t vertexCount;
@@ -72,27 +70,19 @@ HRESULT Sphere::init() {
 	// create vertex buffer
 	{
 		hr = createVertexBuffer(vertices);
-		if (FAILED(hr)) {
-			return hr;
-		}
+		ThrowIfFailed(hr);
 
 		hr = SetResourceName(m_pVertexBuffer, "SphereVertexBuffer");
-		if (FAILED(hr)) {
-			return hr;
-		}
+		ThrowIfFailed(hr);
 	}
 
 	// create index buffer
 	{
 		hr = createIndexBuffer(indices);
-		if (FAILED(hr)) {
-			return hr;
-		}
+		ThrowIfFailed(hr);
 
 		hr = SetResourceName(m_pIndexBuffer, "SphereIndexBuffer");
-		if (FAILED(hr)) {
-			return hr;
-		}
+		ThrowIfFailed(hr);
 	}
 
 	// shaders processing
@@ -105,15 +95,14 @@ HRESULT Sphere::init() {
 			{},
 			&sphereVertexShaderCode
 		);
-		if (FAILED(hr)) {
-			return hr;
-		}
+		ThrowIfFailed(hr);
 
 		hr = compileAndCreateShader(
 			m_pDevice,
 			L"SphereShader.ps",
 			reinterpret_cast<ID3D11DeviceChild**>(&m_pPixelShader)
 		);
+		ThrowIfFailed(hr);
 	}
 
 	// create input layout
@@ -129,28 +118,20 @@ HRESULT Sphere::init() {
 			sphereVertexShaderCode->GetBufferSize(),
 			&m_pInputLayout
 		);
-		if (FAILED(hr)) {
-			return hr;
-		}
+		ThrowIfFailed(hr);
 
 		hr = SetResourceName(m_pInputLayout, "SphereInputLayout");
-		if (FAILED(hr)) {
-			return hr;
-		}
+		ThrowIfFailed(hr);
 	}
 	SAFE_RELEASE(sphereVertexShaderCode);
 
 	// create geometry buffer
 	{
 		hr = createModelBuffer();
-		if (FAILED(hr)) {
-			return hr;
-		}
+		ThrowIfFailed(hr);
 
 		hr = SetResourceName(m_pModelBuffer, "SphereModelBuffer");
-		if (FAILED(hr)) {
-			return hr;
-		}
+		ThrowIfFailed(hr);
 	}
 
 	// create texture
@@ -167,22 +148,16 @@ HRESULT Sphere::init() {
 		}
 
 		hr = createTexture(texDescs);
-		if (FAILED(hr)) {
-			return hr;
-		}
+		ThrowIfFailed(hr);
 
 		hr = SetResourceName(m_pCubeMapTexture, "CubemapTexture");
-		if (FAILED(hr)) {
-			return hr;
-		}
+		ThrowIfFailed(hr);
 	}
 
 	// create resource view
 	{
 		hr = createResourceView(texDescs);
-		if (FAILED(hr)) {
-			return hr;
-		}
+		ThrowIfFailed(hr);
 	}
 	for (int i = 0; i < 6; i++) {
 		free(texDescs[i].pData);
@@ -191,16 +166,16 @@ HRESULT Sphere::init() {
 	return hr;
 }
 
-HRESULT Sphere::createVertexBuffer(std::vector<DirectX::XMFLOAT3>& vertices) {
+HRESULT Sphere::createVertexBuffer(std::vector<Vector3>& vertices) {
 	D3D11_BUFFER_DESC desc{
-		.ByteWidth{ static_cast<UINT>(sizeof(DirectX::XMFLOAT3) * vertices.size()) },
+		.ByteWidth{ static_cast<UINT>(sizeof(Vector3) * vertices.size()) },
 		.Usage{ D3D11_USAGE_IMMUTABLE },
 		.BindFlags{ D3D11_BIND_VERTEX_BUFFER }
 	};
 
 	D3D11_SUBRESOURCE_DATA data{
 		.pSysMem{ vertices.data() },
-		.SysMemPitch{ static_cast<UINT>(sizeof(DirectX::XMFLOAT3) * vertices.size()) }
+		.SysMemPitch{ static_cast<UINT>(sizeof(Vector3) * vertices.size()) }
 	};
 
 	return m_pDevice->CreateBuffer(&desc, &data, &m_pVertexBuffer);
@@ -229,7 +204,7 @@ HRESULT Sphere::createModelBuffer() {
 	};
 
 	ModelBuffer modelBuffer{
-		.matrix{ DirectX::XMMatrixIdentity() },
+		.matrix{ Matrix::Identity },
 		.size{ 2.0f, 0.0f, 0.0f, 0.0f }
 	};
 
@@ -296,7 +271,7 @@ void Sphere::term() {
 
 void Sphere::resize(float r) {
 	ModelBuffer modelBuffer{
-		.matrix{ DirectX::XMMatrixIdentity() },
+		.matrix{ Matrix::Identity },
 		.size{ r, 0.0f, 0.0f, 0.0f }
 	};
 	m_pDeviceContext->UpdateSubresource(m_pModelBuffer, 0, nullptr, &modelBuffer, 0, 0);

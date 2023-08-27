@@ -3,10 +3,9 @@
 #include "framework.h"
 
 class LightSphere {
-
 	typedef struct ModelBuffer {
-		DirectX::XMMATRIX matrix;
-		DirectX::XMFLOAT4 color;
+		DirectX::SimpleMath::Matrix matrix;
+		DirectX::SimpleMath::Color color;
 	};
 
 	ID3D11Device* m_pDevice{};
@@ -22,8 +21,8 @@ class LightSphere {
 
 public:
 typedef struct Light {
-	DirectX::XMFLOAT4 pos{};
-	DirectX::XMFLOAT4 color{
+	DirectX::SimpleMath::Vector4 pos{};
+	DirectX::SimpleMath::Color color{
 		1.0f, 1.0f, 1.0f, 0.0f
 	};
 } Light;
@@ -49,7 +48,7 @@ typedef struct Light {
 	);
 
 private:
-	HRESULT createVertexBuffer(std::vector<DirectX::XMFLOAT3>& vertices);
+	HRESULT createVertexBuffer(std::vector<DirectX::SimpleMath::Vector3>& vertices);
 	HRESULT createIndexBuffer(std::vector<UINT16>& indices);
 	HRESULT createModelBuffer();
 };

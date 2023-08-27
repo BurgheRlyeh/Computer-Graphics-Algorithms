@@ -1,9 +1,11 @@
 ﻿#include "Rect.h"
 #include "ShaderProcessor.h"
 
-HRESULT Rect::init(DirectX::XMFLOAT3* positions, DirectX::XMFLOAT4* colors, int num) {
+using namespace DirectX;
+using namespace DirectX::SimpleMath;
+
+HRESULT Rect::init(Vector3* positions, Vector4* colors, int num) {
     m_pModelBuffers.resize(num);
-    //m_boundingRects.resize(num);
     
     HRESULT hr{ S_OK };
 
@@ -17,52 +19,30 @@ HRESULT Rect::init(DirectX::XMFLOAT3* positions, DirectX::XMFLOAT4* colors, int 
     for (int j{}; j < 2; ++j) {
         for (int i{}; i < 4; ++i) {
             m_boundingRects[j].vmin = {
-                (std::min)(m_boundingRects[j].vmin.x, vertices[i].point.x),
-                (std::min)(m_boundingRects[j].vmin.y, vertices[i].point.y),
-                (std::min)(m_boundingRects[j].vmin.z, vertices[i].point.z)
+                XMMax(m_boundingRects[j].vmin.x, vertices[i].point.x),
+                XMMax(m_boundingRects[j].vmin.y, vertices[i].point.y),
+                XMMax(m_boundingRects[j].vmin.z, vertices[i].point.z)
             };
 
             m_boundingRects[j].vmax = {
-                (std::max)(m_boundingRects[j].vmax.x, vertices[i].point.x),
-                (std::max)(m_boundingRects[j].vmax.y, vertices[i].point.y),
-                (std::max)(m_boundingRects[j].vmax.z, vertices[i].point.z)
+                XMMax(m_boundingRects[j].vmax.x, vertices[i].point.x),
+                XMMax(m_boundingRects[j].vmax.y, vertices[i].point.y),
+                XMMax(m_boundingRects[j].vmax.z, vertices[i].point.z)
             };
         }
     }
-
-    m_boundingRects[0].vmin = {
-        m_boundingRects[0].vmin.x + positions[0].x,
-        m_boundingRects[0].vmin.y + positions[0].y,
-        m_boundingRects[0].vmin.z + positions[0].z
-    };
-    m_boundingRects[0].vmax = {
-        m_boundingRects[0].vmax.x + positions[0].x,
-        m_boundingRects[0].vmax.y + positions[0].y,
-        m_boundingRects[0].vmax.z + positions[0].z
-    };
-    m_boundingRects[1].vmin = {
-        m_boundingRects[1].vmin.x + positions[1].x,
-        m_boundingRects[1].vmin.y + positions[1].y,
-        m_boundingRects[1].vmin.z + positions[1].z
-    };
-    m_boundingRects[1].vmax = {
-        m_boundingRects[1].vmax.x + positions[1].x,
-        m_boundingRects[1].vmax.y + positions[1].y,
-        m_boundingRects[1].vmax.z + positions[1].z
-    };
+    m_boundingRects[0].vmin += positions[0];
+    m_boundingRects[0].vmax += positions[0];
+    m_boundingRects[1].vmin += positions[1];
+    m_boundingRects[1].vmax += positions[1];
 
     // create vertex buffer
     {
-
         hr = createVertexBuffer(vertices, sizeof(vertices) / sizeof(*vertices));
-        if (FAILED(hr)) {
-            return hr;
-        }
+        ThrowIfFailed(hr);
 
         hr = SetResourceName(m_pVertexBuffer, "RectVertexBuffer");
-        if (FAILED(hr)) {
-            return hr;
-        }
+        ThrowIfFailed(hr);
     }
 
     // create index buffer
@@ -73,14 +53,10 @@ HRESULT Rect::init(DirectX::XMFLOAT3* positions, DirectX::XMFLOAT4* colors, int 
         };
 
         hr = createIndexBuffer(indices, sizeof(indices) / sizeof(*indices));
-        if (FAILED(hr)) {
-            return hr;
-        }
+        ThrowIfFailed(hr);
 
         hr = SetResourceName(m_pIndexBuffer, "RectIndexBuffer");
-        if (FAILED(hr)) {
-            return hr;
-        }
+        ThrowIfFailed(hr);
     }
 
     // shaders processing
@@ -93,9 +69,7 @@ HRESULT Rect::init(DirectX::XMFLOAT3* positions, DirectX::XMFLOAT4* colors, int 
             {},
             &vertexShaderCode
         );
-        if (FAILED(hr)) {
-            return hr;
-        }
+        ThrowIfFailed(hr);
 
         hr = compileAndCreateShader(
             m_pDevice,
@@ -103,32 +77,14 @@ HRESULT Rect::init(DirectX::XMFLOAT3* positions, DirectX::XMFLOAT4* colors, int 
             (ID3D11DeviceChild**)&m_pPixelShader,
             { "USE_LIGHTS" }
         );
-        if (FAILED(hr)) {
-            return hr;
-        }
+        ThrowIfFailed(hr);
     }
 
     // create input layout
     {
         D3D11_INPUT_ELEMENT_DESC InputDesc[]{
-            {
-                "POSITION",
-                0,
-                DXGI_FORMAT_R32G32B32_FLOAT,
-                0,
-                0,
-                D3D11_INPUT_PER_VERTEX_DATA,
-                0
-            },
-            {
-                "COLOR",
-                0,
-                DXGI_FORMAT_R8G8B8A8_UNORM,
-                0,
-                12,
-                D3D11_INPUT_PER_VERTEX_DATA,
-                0
-            }
+            { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+            { "COLOR", 0, DXGI_FORMAT_R8G8B8A8_UNORM, 0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0 }
         };
 
         hr = m_pDevice->CreateInputLayout(
@@ -138,21 +94,17 @@ HRESULT Rect::init(DirectX::XMFLOAT3* positions, DirectX::XMFLOAT4* colors, int 
             vertexShaderCode->GetBufferSize(),
             &m_pInputLayout
         );
-        if (FAILED(hr)) {
-            return hr;
-        }
+        ThrowIfFailed(hr);
 
         hr = SetResourceName(m_pInputLayout, "RectInputLayout");
-        if (FAILED(hr)) {
-            return hr;
-        }
+        ThrowIfFailed(hr);
     }
     SAFE_RELEASE(vertexShaderCode);
 
     // create model buffers
     for (int idx{}; idx < num; ++idx) {
         ModelBuffer modelBuffer{
-            DirectX::XMMatrixTranslation(
+            XMMatrixTranslation(
                 positions[idx].x,
                 positions[idx].y,
                 positions[idx].z
@@ -161,23 +113,10 @@ HRESULT Rect::init(DirectX::XMFLOAT3* positions, DirectX::XMFLOAT4* colors, int 
         };
 
         hr = createModelBuffer(modelBuffer, idx);
-        if (FAILED(hr)) {
-            return hr;
-        }
+        ThrowIfFailed(hr);
 
         hr = SetResourceName(m_pModelBuffers[idx], "RectModelBuffer" + idx);
-        if (FAILED(hr)) {
-            return hr;
-        }
-
-        // init bounding rects
-        /*for (int i{}; i < sizeof(vertices) / sizeof(*vertices); ++i) {
-            m_boundingRects[idx].v[i] = {
-                vertices[i].point.x + positions[idx].x,
-                vertices[i].point.y + positions[idx].y,
-                vertices[i].point.z + positions[idx].z
-            };
-        }*/
+        ThrowIfFailed(hr);
     }
 
     return hr;
@@ -239,7 +178,7 @@ void Rect::term() {
     SAFE_RELEASE(m_pInputLayout);
 }
 
-void Rect::update(DirectX::XMMATRIX matrix) {
+void Rect::update(Matrix matrix) {
     ModelBuffer modelBuffer{ matrix };
 
     // обновление буфера
@@ -251,7 +190,7 @@ void Rect::render(
     ID3D11Buffer* viewProjectionBuffer,
     ID3D11DepthStencilState* m_pTransDepthState,
     ID3D11BlendState* m_pTransBlendState,
-    DirectX::XMFLOAT3 cameraPos
+    Vector3 cameraPos
 ) {
     m_pDeviceContext->OMSetDepthStencilState(m_pTransDepthState, 0);
 
@@ -272,23 +211,13 @@ void Rect::render(
 
     float d0{}, d1{};
     for (int i = 0; i < 8; i++) {
-        DirectX::XMFLOAT3 v1{ m_boundingRects[0].getVert(i) };
-        DirectX::XMFLOAT3 p1{
-            cameraPos.x - v1.x,
-            cameraPos.y - v1.y,
-            cameraPos.z - v1.z
-        };
-        float l1{ powf(p1.x, 2) + powf(p1.y, 2) + powf(p1.z, 2) };
-        d0 = DirectX::XMMax(d0, l1);
+        Vector3 p1{ cameraPos - m_boundingRects[0].getVert(i) };
+        float l1{ p1.Length() };
+        d0 = XMMax(d0, l1);
 
-        DirectX::XMFLOAT3 v2{ m_boundingRects[1].getVert(i) };
-        DirectX::XMFLOAT3 p2{
-            cameraPos.x - v2.x,
-            cameraPos.y - v2.y,
-            cameraPos.z - v2.z
-        };
-        float l2{ powf(p2.x, 2) + powf(p2.y, 2) + powf(p2.z, 2) };
-        d1 = DirectX::XMMax(d1, l2);
+        Vector3 p2{ cameraPos - m_boundingRects[1].getVert(i) };
+        float l2{ p2.Length() };
+        d1 = XMMax(d1, l2);
     }
 
     if (d0 > d1) {
@@ -312,31 +241,4 @@ void Rect::render(
         m_pDeviceContext->PSSetConstantBuffers(0, 2, cbuffers);
         m_pDeviceContext->DrawIndexed(6, 0, 0);
     }
-
-    /*std::vector<std::pair<float, int>> depthIdxPairs{};
-    depthIdxPairs.resize(m_pModelBuffers.size());
-
-    for (int i{}; i < m_pModelBuffers.size(); ++i) {
-        float depth{};
-        for (int j{}; j < 8; ++j) {
-            DirectX::XMFLOAT3 point{
-                cameraPos.x - m_boundingRects[i].v[j].x,
-                cameraPos.y - m_boundingRects[i].v[j].y,
-                cameraPos.z - m_boundingRects[i].v[j].z,
-            };
-            float length = point.x * point.x + point.y * point.y + point.z * point.z;
-
-            depth = DirectX::XMMax(depth, length);
-        }
-        depthIdxPairs[i] = std::make_pair(depth, i);
-    }
-
-    std::sort(depthIdxPairs.begin(), depthIdxPairs.end());
-
-    for (int i{ static_cast<int>(m_pModelBuffers.size() - 1) }; 0 <= i; --i) {
-        cbuffers[1] = m_pModelBuffers[depthIdxPairs[i].second];
-        m_pDeviceContext->VSSetConstantBuffers(0, 2, cbuffers);
-        m_pDeviceContext->PSSetConstantBuffers(0, 2, cbuffers);
-        m_pDeviceContext->DrawIndexed(6, 0, 0);
-    }*/
 }

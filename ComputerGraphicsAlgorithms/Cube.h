@@ -15,23 +15,25 @@ struct AABB;
 
 class Cube {
     typedef struct TextureTangentVertex {
-        DirectX::XMFLOAT3 point{};
-        DirectX::XMFLOAT3 tangent{};
-        DirectX::XMFLOAT3 norm{};
-        DirectX::XMFLOAT2 texture{};
+        DirectX::SimpleMath::Vector3 point{};
+        DirectX::SimpleMath::Vector3 tangent{};
+        DirectX::SimpleMath::Vector3 norm{};
+        DirectX::SimpleMath::Vector2 texture{};
     } Vertex;
 
     typedef struct ModelBuffer {
-        DirectX::XMMATRIX matrix{};
-        DirectX::XMMATRIX normalMatrix{};
+        DirectX::SimpleMath::Matrix matrix{};
+        DirectX::SimpleMath::Matrix normalMatrix{};
         // x - shininess
         // y - rotation speed
         // z - texture id
         // w - normal map presence
-        DirectX::XMFLOAT4 settings{};
+        DirectX::SimpleMath::Vector4 settings{};
         // x, y, z - position
         // w - current angle
-        DirectX::XMFLOAT4 posAndAng{};
+        DirectX::SimpleMath::Vector4 posAndAng{};
+
+        void updateMatrices();
     } ModelBuffer;
 
     ID3D11Device* m_pDevice{};
@@ -69,7 +71,7 @@ public:
 
     bool m_doCull{ true };
 
-    HRESULT init(DirectX::XMMATRIX* positions, int num);
+    HRESULT init(DirectX::SimpleMath::Matrix* positions, int num);
     void term();
 
     void update(float delta, bool isRotate);
@@ -89,4 +91,5 @@ private:
     HRESULT createModelBuffer();
     HRESULT createTexture(TextureDesc& textureDesc, ID3D11Texture2D** texture);
     HRESULT createResourceView(TextureDesc& textureDesc, ID3D11Texture2D* pTexture, ID3D11ShaderResourceView** pShaderResourceView);
+
 };

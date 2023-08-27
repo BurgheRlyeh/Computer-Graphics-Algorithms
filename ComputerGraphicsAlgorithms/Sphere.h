@@ -7,8 +7,8 @@ struct TextureDesc;
 
 class Sphere {
     typedef struct ModelBuffer {
-        DirectX::XMMATRIX matrix;
-        DirectX::XMFLOAT4 size;
+        DirectX::SimpleMath::Matrix matrix;
+        DirectX::SimpleMath::Vector4 size;
     } ModelBuffer;
 
     ID3D11Device* m_pDevice{};
@@ -37,7 +37,7 @@ public:
     void render(ID3D11SamplerState* sampler, ID3D11Buffer* viewProjectionBuffer);
 
 private:
-    HRESULT createVertexBuffer(std::vector<DirectX::XMFLOAT3>& vertices);
+    HRESULT createVertexBuffer(std::vector<DirectX::SimpleMath::Vector3>& vertices);
     HRESULT createIndexBuffer(std::vector<UINT16>& indices);
     HRESULT createModelBuffer();
     HRESULT createTexture(TextureDesc(&texDescs)[]);
