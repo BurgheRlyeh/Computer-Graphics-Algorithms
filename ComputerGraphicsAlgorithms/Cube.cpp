@@ -136,10 +136,10 @@ HRESULT Cube::init(Matrix* positions, int num) {
 
 	// init models
 	{
-		const float diag = sqrtf(2.0f) / 2.0f * 0.5f;
+		const float diag = sqrtf(2.0f) / 2.0f * 0.9f;
 		Vector3 diagonal{ diag, 0.5f, diag };
 
-		Vector3 pos{ 1e-5f, 0.0f, 0.0f };
+		Vector3 pos{ 0.0f, 0.0f, 0.0f };
 
 		int useNM{ 1 };
 		m_modelBuffers[0].settings = {

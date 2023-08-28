@@ -344,12 +344,12 @@ bool Renderer::update() {
 bool Renderer::render() {
 	m_pDeviceContext->ClearState();
 
-	ID3D11RenderTargetView* views[]{ m_pBackBufferRTV };
+	ID3D11RenderTargetView* views[]{ m_pPostProcess->getBufferRTV()};
 	// привязываем буфер глубины к Output-Merger этапу
 	m_pDeviceContext->OMSetRenderTargets(1, views, m_pDepthBufferDSV);
 
 	static const FLOAT BackColor[4]{ 0.25f, 0.25f, 0.25f, 1.0f };
-	m_pDeviceContext->ClearRenderTargetView(m_pBackBufferRTV, BackColor);
+	m_pDeviceContext->ClearRenderTargetView(m_pPostProcess->getBufferRTV(), BackColor);
 	// очистка буфера глубины
 	m_pDeviceContext->ClearDepthStencilView(m_pDepthBufferDSV, D3D11_CLEAR_DEPTH, 0.0f, 0);
 
@@ -395,6 +395,8 @@ bool Renderer::render() {
 		m_camera.getPosition()
 	);
 
+	m_pPostProcess->render(m_pBackBufferRTV, m_pSampler);
+
 	// Start the Dear ImGui frame
 	ImGui_ImplDX11_NewFrame();
 	ImGui_ImplWin32_NewFrame();
@@ -406,11 +408,12 @@ bool Renderer::render() {
 		ImGui::Checkbox("Show bulbs", &m_isShowLights);
 		ImGui::Checkbox("Use normal maps", &m_isUseNormalMaps);
 		ImGui::Checkbox("Show normals", &m_isShowNormals);
-		//ImGui::Checkbox("Use ambient light", &m_isUseAmbient);
+		ImGui::Checkbox("Use sepia", &m_pPostProcess->m_useSepia);
 
 		m_sceneBuffer.lightCount.y = m_isUseNormalMaps ? 1 : 0;
 		m_sceneBuffer.lightCount.z = m_isShowNormals ? 1 : 0;
 		m_sceneBuffer.lightCount.w = m_pCube->m_doCull ? 1 : 0;
+		m_sceneBuffer.postProcess.x = m_pPostProcess->m_useSepia ? 1 : 0;
 
 		bool add = ImGui::Button("+");
 		ImGui::SameLine();
@@ -465,6 +468,13 @@ HRESULT Renderer::setupBackBuffer() {
 	ThrowIfFailed(hr);
 
 	hr = SetResourceName(m_pDepthBufferDSV, "DepthBufferView");
+	ThrowIfFailed(hr);
+
+	m_pPostProcess = new PostProcess(m_pDevice, m_pDeviceContext);
+	hr = m_pPostProcess->init();
+	ThrowIfFailed(hr);
+
+	hr = m_pPostProcess->setupBuffer(m_width, m_height);
 	ThrowIfFailed(hr);
 
 	return hr;

@@ -28,7 +28,8 @@ class Sphere {
 public:
     Sphere(ID3D11Device* device, ID3D11DeviceContext* deviceContext):
         m_pDevice(device),
-        m_pDeviceContext(deviceContext) {}
+        m_pDeviceContext(deviceContext)
+    {}
 
     HRESULT init();
     void term();

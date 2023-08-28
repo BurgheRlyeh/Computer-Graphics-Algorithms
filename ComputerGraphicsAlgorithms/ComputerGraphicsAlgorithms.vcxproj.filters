@@ -93,6 +93,9 @@
     <ClInclude Include="Camera.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="PostProcess.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="ComputerGraphicsAlgorithms.cpp">
@@ -143,6 +146,9 @@
     <ClCompile Include="Camera.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="PostProcess.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="ComputerGraphicsAlgorithms.rc">
@@ -177,6 +183,12 @@
       <Filter>Shaders</Filter>
     </None>
     <None Include="TransColor.ps">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Sepia.vs">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Sepia.ps">
       <Filter>Shaders</Filter>
     </None>
   </ItemGroup>

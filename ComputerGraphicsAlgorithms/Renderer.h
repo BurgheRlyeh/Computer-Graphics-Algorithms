@@ -15,6 +15,7 @@
 #include "LightSphere.h"
 #include "Camera.h"
 #include "AABB.h"
+#include "PostProcess.h"
 
 #include "SimpleMath.h"
 
@@ -26,12 +27,14 @@ class Rect;
 class LightSphere;
 struct Camera;
 struct AABB;
+struct PostProcess;
 
 class Renderer {
 	typedef struct SceneBuffer {
 		DirectX::SimpleMath::Matrix vp{};
 		DirectX::SimpleMath::Vector4 cameraPos{};
 		DirectX::XMINT4 lightCount{};
+		DirectX::XMINT4 postProcess{}; // x - use sepia
 		LightSphere::Light lights[10]{};
 		DirectX::SimpleMath::Color ambientColor{};
 	} SceneBuffer;
@@ -81,6 +84,8 @@ class Renderer {
 
 	Camera m_camera{};
 
+	PostProcess* m_pPostProcess{};
+
 	Cube* m_pCube{};
 	float m_cubeAngleRotation{};
 
@@ -106,8 +111,6 @@ class Renderer {
 	UINT m_width{ 16 };
 	UINT m_height{ 16 };
 
-	//Camera m_camera{};
-
 	bool m_isModelRotate{ true };
 
 	size_t m_prevTime{};
@@ -118,6 +121,7 @@ class Renderer {
 	bool m_isUseNormalMaps{ true };
 	bool m_isShowNormals{};
 	bool m_isUseAmbient{ true };
+	bool m_useSepia{};
 
 public:
 	MouseHandler m_mouseHandler;
@@ -149,6 +153,4 @@ private:
 	HRESULT createRasterizerState();
 	HRESULT createReversedDepthState();
 	HRESULT createSampler();
-
-	void cullBoxes();
 };

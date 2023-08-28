@@ -152,6 +152,7 @@
     <ClInclude Include="framework.h" />
     <ClInclude Include="Light.h" />
     <ClInclude Include="LightSphere.h" />
+    <ClInclude Include="PostProcess.h" />
     <ClInclude Include="Rect.h" />
     <ClInclude Include="Renderer.h" />
     <ClInclude Include="Resource.h" />
@@ -173,6 +174,7 @@
     <ClCompile Include="ComputerGraphicsAlgorithms.cpp" />
     <ClCompile Include="Cube.cpp" />
     <ClCompile Include="LightSphere.cpp" />
+    <ClCompile Include="PostProcess.cpp" />
     <ClCompile Include="Rect.cpp" />
     <ClCompile Include="Renderer.cpp" />
     <ClCompile Include="ShaderProcessor.cpp" />
@@ -192,6 +194,8 @@
       </ExcludedFromBuild>
     </None>
     <None Include="packages.config" />
+    <None Include="Sepia.ps" />
+    <None Include="Sepia.vs" />
     <None Include="SphereShader.ps" />
     <None Include="SphereShader.vs" />
     <None Include="SphereTexture.ps" />
