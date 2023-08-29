@@ -193,6 +193,7 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
       </ExcludedFromBuild>
     </None>
+    <None Include="FrustumCull.cs" />
     <None Include="packages.config" />
     <None Include="Sepia.ps" />
     <None Include="Sepia.vs" />

@@ -334,9 +334,18 @@ bool Renderer::update() {
 	//ViewProjectionBuffer& sceneBuffer = *reinterpret_cast<ViewProjectionBuffer*>(subresource.pData);
 	m_sceneBuffer.vp = v * p;
 	m_sceneBuffer.cameraPos = { cameraPos.x, cameraPos.y, cameraPos.z, 0.0f };
+	m_pCube->calcFrustum(
+		m_camera,
+		static_cast<float>(m_height) / m_width,
+		m_sceneBuffer.frustum
+	);
+	
 	memcpy(subresource.pData, &m_sceneBuffer, sizeof(SceneBuffer));
 
 	m_pDeviceContext->Unmap(m_pSceneBuffer, 0);
+
+	// update culling parameters
+	m_pCube->updateCullParams();
 
 	return SUCCEEDED(hr);
 }
@@ -377,7 +386,7 @@ bool Renderer::render() {
 
 	m_pDeviceContext->OMSetBlendState(m_pOpaqueBlendState, nullptr, 0xFFFFFFFF);
 
- 	m_pCube->cullBoxes(m_camera, static_cast<float>(m_height) / m_width);
+	m_pCube->cullBoxes(m_pSceneBuffer, m_camera, static_cast<float>(m_height) / m_width);
 
 	m_pCube->render(m_pSampler, m_pSceneBuffer);
 
@@ -397,6 +406,8 @@ bool Renderer::render() {
 
 	m_pPostProcess->render(m_pBackBufferRTV, m_pSampler);
 
+	m_pCube->readQueries();
+
 	// Start the Dear ImGui frame
 	ImGui_ImplDX11_NewFrame();
 	ImGui_ImplWin32_NewFrame();
@@ -412,7 +423,6 @@ bool Renderer::render() {
 
 		m_sceneBuffer.lightCount.y = m_isUseNormalMaps ? 1 : 0;
 		m_sceneBuffer.lightCount.z = m_isShowNormals ? 1 : 0;
-		m_sceneBuffer.lightCount.w = m_pCube->m_doCull ? 1 : 0;
 		m_sceneBuffer.postProcess.x = m_pPostProcess->m_useSepia ? 1 : 0;
 
 		bool add = ImGui::Button("+");
@@ -438,6 +448,8 @@ bool Renderer::render() {
 		ImGui::End();
 
 		m_pCube->initImGUI();
+		
+		m_sceneBuffer.lightCount.w = static_cast<int>(m_pCube->getIsDoCull());
 	}
 
 	// Rendering
@@ -600,7 +612,6 @@ HRESULT Renderer::initScene() {
 	ThrowIfFailed(hr);
 
 	m_pRect = new Rect(m_pDevice, m_pDeviceContext);
-
 	Vector3 rectPositions[]{
 		{ 1.0f, 0, 0.0f },
 		{ 1.2f, 0, 0.0f }
@@ -610,9 +621,13 @@ HRESULT Renderer::initScene() {
 		{ 0.0f, 0.25f, 1.0f, 0.5f }
 	};
 	hr = m_pRect->init(rectPositions, rectColors, 2);
+	ThrowIfFailed(hr);
 
 	m_pLightSphere = new LightSphere(m_pDevice, m_pDeviceContext);
 	hr = m_pLightSphere->init();
+	ThrowIfFailed(hr);
+
+	hr = m_pCube->initCull();
 	ThrowIfFailed(hr);
 
 	return hr;

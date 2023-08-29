@@ -19,6 +19,14 @@ void Cube::ModelBuffer::updateMatrices() {
 	normalMatrix = matrix.Invert().Transpose();
 }
 
+float Cube::getModelRotationSpeed() {
+	return m_modelRotationSpeed;
+}
+
+bool Cube::getIsDoCull() {
+	return m_doCull;
+}
+
 HRESULT Cube::init(Matrix* positions, int num) {
 	HRESULT hr{ S_OK };
 
@@ -164,6 +172,7 @@ HRESULT Cube::init(Matrix* positions, int num) {
 			initModel(m_modelBuffers[i], m_modelBBs[i]);
 		}
 		m_instCount = 10;*/
+		m_updateCullParams = true;
 	}
 
 	// create model visibility buffer
@@ -384,6 +393,18 @@ void Cube::term() {
 
 	SAFE_RELEASE(m_pTextureNM);
 	SAFE_RELEASE(m_pTextureViewNM);
+
+	// Term GPU culling setup
+	SAFE_RELEASE(m_pCullShader);
+	SAFE_RELEASE(m_pIndirectArgsSrc);
+	SAFE_RELEASE(m_pIndirectArgs);
+	SAFE_RELEASE(m_pCullParams);
+	SAFE_RELEASE(m_pIndirectArgsUAV);
+	SAFE_RELEASE(m_pModelBufferInstVisGPU);
+	SAFE_RELEASE(m_pModelBufferInstVisGPU_UAV);
+	for (int i = 0; i < 10; i++) {
+		SAFE_RELEASE(m_queries[i]);
+	}
 }
 
 void Cube::update(float delta, bool isRotate) {
@@ -422,27 +443,323 @@ void Cube::render(ID3D11SamplerState* pSampler, ID3D11Buffer* pSceneBuffer) {
 
 	m_pDeviceContext->PSSetShader(m_pPixelShader, nullptr, 0);
 
-	m_pDeviceContext->DrawIndexedInstanced(
-		36,
-		m_doCull ? m_instVisCount : m_instCount,
-		0, 0, 0
+	if (m_doCull) {
+		if (m_computeCull) {
+			m_pDeviceContext->CopyResource(m_pIndirectArgs, m_pIndirectArgsSrc);
+			m_pDeviceContext->Begin(m_queries[m_curFrame % 10]);
+			m_pDeviceContext->DrawIndexedInstancedIndirect(m_pIndirectArgs, 0);
+			m_pDeviceContext->End(m_queries[m_curFrame++ % 10]);
+		}
+		else {
+			m_pDeviceContext->DrawIndexedInstanced(36, m_instVisCount, 0, 0, 0);
+		}
+	}
+	else {
+		m_pDeviceContext->DrawIndexedInstanced(36, m_instCount, 0, 0, 0);
+	}
+}
+
+HRESULT Cube::initCull() {
+	HRESULT hr{ S_OK };
+
+	// create shader
+	hr = compileAndCreateShader(
+		m_pDevice,
+		L"FrustumCull.cs",
+		(ID3D11DeviceChild**)&m_pCullShader
+	);
+	ThrowIfFailed(hr);
+
+	// create indirect args buffer (for calculation)
+	{
+		D3D11_BUFFER_DESC desc{
+			.ByteWidth{ sizeof(D3D11_DRAW_INDEXED_INSTANCED_INDIRECT_ARGS) },
+			.Usage{ D3D11_USAGE_DEFAULT },
+			.BindFlags{ D3D11_BIND_UNORDERED_ACCESS },
+			.CPUAccessFlags{},
+			.MiscFlags{ D3D11_RESOURCE_MISC_BUFFER_STRUCTURED },
+			.StructureByteStride{ sizeof(UINT) }
+		};
+
+		hr = m_pDevice->CreateBuffer(
+			&desc, nullptr, &m_pIndirectArgsSrc
+		);
+		ThrowIfFailed(hr);
+
+		hr = SetResourceName(m_pIndirectArgsSrc, "IndirectArgsSrc");
+		ThrowIfFailed(hr);
+
+		D3D11_UNORDERED_ACCESS_VIEW_DESC uavDesc{
+			.Format{ DXGI_FORMAT_UNKNOWN },
+			.ViewDimension{ D3D11_UAV_DIMENSION_BUFFER },
+			.Buffer{
+				.FirstElement{},
+				.NumElements{
+					sizeof(D3D11_DRAW_INDEXED_INSTANCED_INDIRECT_ARGS) / sizeof(UINT)
+				},
+				.Flags{}
+			}
+		};
+
+		hr = m_pDevice->CreateUnorderedAccessView(
+			m_pIndirectArgsSrc, &uavDesc, &m_pIndirectArgsUAV
+		);
+		ThrowIfFailed(hr);
+
+		hr = SetResourceName(m_pIndirectArgsSrc, "IndirectArgsUAV");
+		ThrowIfFailed(hr);
+	}
+
+	// create indirect args buffer (for usage)
+	{
+		D3D11_BUFFER_DESC desc{
+			.ByteWidth{ sizeof(D3D11_DRAW_INDEXED_INSTANCED_INDIRECT_ARGS) },
+			.Usage{ D3D11_USAGE_DEFAULT },
+			.BindFlags{},
+			.CPUAccessFlags{},
+			.MiscFlags{ D3D11_RESOURCE_MISC_DRAWINDIRECT_ARGS },
+			.StructureByteStride{}
+		};
+
+		hr = m_pDevice->CreateBuffer(&desc, nullptr, &m_pIndirectArgs);
+		ThrowIfFailed(hr);
+
+		hr = SetResourceName(m_pIndirectArgsSrc, "IndirectArgs");
+		ThrowIfFailed(hr);
+	}
+
+	// create culling params buffer
+	{
+		D3D11_BUFFER_DESC desc{
+			.ByteWidth{ sizeof(CullParams) },
+			.Usage{ D3D11_USAGE_DEFAULT },
+			.BindFlags{ D3D11_BIND_CONSTANT_BUFFER }
+		};
+
+		hr = m_pDevice->CreateBuffer(&desc, nullptr, &m_pCullParams);
+		ThrowIfFailed(hr);
+
+		hr = SetResourceName(m_pCullParams, "CullParams");
+	}
+
+	// create output buffer
+	{
+		D3D11_BUFFER_DESC desc{
+			.ByteWidth{ sizeof(XMINT4) * MaxInstances },
+			.Usage{ D3D11_USAGE_DEFAULT },
+			.BindFlags{ D3D11_BIND_UNORDERED_ACCESS },
+			.CPUAccessFlags{},
+			.MiscFlags{ D3D11_RESOURCE_MISC_BUFFER_STRUCTURED },
+			.StructureByteStride{ sizeof(XMINT4) }
+		};
+
+		hr = m_pDevice->CreateBuffer(&desc, nullptr, &m_pModelBufferInstVisGPU);
+		ThrowIfFailed(hr);
+
+		hr = SetResourceName(m_pModelBufferInstVisGPU, "ModelBufferInstVisGPU");
+		ThrowIfFailed(hr);
+
+		D3D11_UNORDERED_ACCESS_VIEW_DESC uavDesc{
+			.Format{ DXGI_FORMAT_UNKNOWN },
+			.ViewDimension{ D3D11_UAV_DIMENSION_BUFFER },
+			.Buffer{
+				.FirstElement{},
+				.NumElements{ MaxInstances },
+				.Flags{}
+			}
+		};
+
+		hr = m_pDevice->CreateUnorderedAccessView(m_pModelBufferInstVisGPU, &uavDesc, &m_pModelBufferInstVisGPU_UAV);
+		ThrowIfFailed(hr);
+
+		hr = SetResourceName(m_pIndirectArgsSrc, "ModelBufferInstVisGPU_UAV");
+		ThrowIfFailed(hr);
+	}
+
+	{
+		D3D11_QUERY_DESC desc{
+			.Query{ D3D11_QUERY_PIPELINE_STATISTICS },
+			.MiscFlags{}
+		};
+		for (int i{}; i < 10 && SUCCEEDED(hr); ++i) {
+			hr = m_pDevice->CreateQuery(&desc, &m_queries[i]);
+		}
+		ThrowIfFailed(hr);
+	}
+
+	return hr;
+}
+
+void Cube::calcFrustum(Camera& camera, float aspectRatio, Plane frustum[6]) {
+	Vector3 dir{ -1.f * camera.getDir() };
+	Vector3 up{ camera.getUp() };
+	Vector3 right{ camera.getRight() };
+	Vector3 pos{ camera.getPosition() };
+
+	float n{ 0.1f };
+	float f{ 100.0f };
+	float fov{ XM_PI / 3 };
+
+	float x{ n * tanf(fov / 2) };
+	float y{ n * tanf(fov / 2) * aspectRatio };
+
+	Vector3 nearVertices[4]{
+		pos + dir * n - up * y - right * x,
+		pos + dir * n - up * y + right * x,
+		pos + dir * n + up * y + right * x,
+		pos + dir * n + up * y - right * x
+	};
+
+	x = f * tanf(fov / 2);
+	y = f * tanf(fov / 2) * aspectRatio;
+
+	Vector3 farVertices[4]{
+		pos + dir * f - up * y - right * x,
+		pos + dir * f - up * y + right * x,
+		pos + dir * f + up * y + right * x,
+		pos + dir * f + up * y - right * x
+	};
+
+	frustum[0] = Plane(nearVertices[0], nearVertices[1], nearVertices[2]);
+	frustum[1] = Plane(nearVertices[0], farVertices[0], farVertices[1]);
+	frustum[2] = Plane(nearVertices[1], farVertices[1], farVertices[2]);
+	frustum[3] = Plane(nearVertices[2], farVertices[2], farVertices[3]);
+	frustum[4] = Plane(nearVertices[3], farVertices[3], farVertices[0]);
+	frustum[5] = Plane(farVertices[1], farVertices[0], farVertices[3]);
+}
+
+void Cube::updateCullParams() {
+	if (!m_updateCullParams) {
+		return;
+	}
+	m_updateCullParams = false;
+
+	CullParams cullParams{};
+	cullParams.shapeCount = {
+		static_cast<int>(m_instCount), 0, 0, 0
+	};
+
+	for (UINT i{}; i < m_instCount; ++i) {
+		cullParams.bbMin[i] = {
+			m_modelBBs[i].vmin.x,
+			m_modelBBs[i].vmin.y,
+			m_modelBBs[i].vmin.z,
+			0.0f
+		};
+		cullParams.bbMax[i] = {
+			m_modelBBs[i].vmax.x,
+			m_modelBBs[i].vmax.y,
+			m_modelBBs[i].vmax.z,
+			0.0f
+		};
+	}
+
+	m_pDeviceContext->UpdateSubresource(
+		m_pCullParams, 0, nullptr, &cullParams, 0, 0
 	);
 }
 
-float Cube::getModelRotationSpeed() {
-	return m_modelRotationSpeed;
+// is box inside
+bool isBoxInside(const Plane frustum[6], const Vector3& bbMin, const Vector3& bbMax) {
+	for (int i{}; i < 6; ++i) {
+		Vector4 p{
+			signbit(frustum[i].x) ? bbMin.x : bbMax.x,
+			signbit(frustum[i].y) ? bbMin.y : bbMax.y,
+			signbit(frustum[i].z) ? bbMin.z : bbMax.z,
+			1.f
+		};
+		if (p.Dot(frustum[i]) < 0.f) {
+			return false;
+		}
+	}
+	return true;
+}
+
+void Cube::cullBoxes(ID3D11Buffer* m_pSceneBuffer, Camera& camera, float aspectRatio) {
+	if (m_computeCull) {
+		D3D11_DRAW_INDEXED_INSTANCED_INDIRECT_ARGS args{
+			.IndexCountPerInstance{ 36 },
+			.InstanceCount{},
+			.StartIndexLocation{},
+			.BaseVertexLocation{},
+			.StartInstanceLocation{}
+		};
+
+		m_pDeviceContext->UpdateSubresource(m_pIndirectArgsSrc, 0, nullptr, &args, 0, 0);
+	
+		UINT groupNumber = DivUp(m_instCount, 64u);
+
+		ID3D11Buffer* constBuffers[2]{
+			m_pSceneBuffer, m_pCullParams
+		};
+		m_pDeviceContext->CSSetConstantBuffers(0, 2, constBuffers);
+
+		ID3D11UnorderedAccessView* uavBuffers[2]{
+			m_pIndirectArgsUAV, m_pModelBufferInstVisGPU_UAV
+		};
+		m_pDeviceContext->CSSetUnorderedAccessViews(0, 2, uavBuffers, nullptr);
+
+		m_pDeviceContext->CSSetShader(m_pCullShader, nullptr, 0);
+		m_pDeviceContext->Dispatch(groupNumber, 1, 1);
+		m_pDeviceContext->CopyResource(m_pModelBufferInstVis, m_pModelBufferInstVisGPU);
+	}
+	else {
+		Plane frustum[6];
+		calcFrustum(camera, aspectRatio, frustum);
+
+		std::vector<XMINT4> ids(MaxInstances);
+
+		m_instVisCount = 0;
+		for (UINT i{}; i < m_instCount; ++i) {
+			if (isBoxInside(frustum, m_modelBBs[i].vmin, m_modelBBs[i].vmax)) {
+				ids[m_instVisCount++].x = i;
+			}
+		}
+
+		D3D11_MAPPED_SUBRESOURCE subresource;
+		HRESULT hr = m_pDeviceContext->Map(m_pModelBufferInstVis, 0, D3D11_MAP_WRITE_DISCARD, 0, &subresource);
+		ThrowIfFailed(hr);
+
+		memcpy(subresource.pData, ids.data(), sizeof(XMINT4) * m_instVisCount);
+		m_pDeviceContext->Unmap(m_pModelBufferInstVis, 0);
+	}
+}
+
+void Cube::readQueries() {
+	D3D11_QUERY_DATA_PIPELINE_STATISTICS stats;
+	while (m_lastCompletedFrame < m_curFrame) {
+		HRESULT hr = m_pDeviceContext->GetData(
+			m_queries[m_lastCompletedFrame % 10],
+			&stats,
+			sizeof(D3D11_QUERY_DATA_PIPELINE_STATISTICS),
+			0
+		);
+		if (hr != S_OK) {
+			break;
+		}
+		m_gpuVisibleInstances = (int)stats.IAPrimitives / 12;
+		++m_lastCompletedFrame;
+	}
 }
 
 void Cube::initImGUI() {
 	ImGui::Begin("Instances");
+
 	bool add = ImGui::Button("+");
 	ImGui::SameLine();
 	bool remove = ImGui::Button("-");
+
 	ImGui::Text("Count %d", m_instCount);
-	ImGui::Text("Visible %d", m_instVisCount);
+	if (m_computeCull) {
+		ImGui::Text("Visible (GPU) %d", m_gpuVisibleInstances);
+	} else {
+		ImGui::Text("Visible %d", m_instVisCount);
+	}
 	ImGui::Checkbox("Cull", &m_doCull);
-	ImGui::SameLine();
+	ImGui::Checkbox("Cull on GPU", &m_computeCull);
+
 	ImGui::End();
+
 	if (add && m_instCount < MaxInstances) {
 		Vector4 pos{ m_modelBuffers[m_instCount].posAndAng };
 		if (!pos.x && !pos.y && !pos.z) {
@@ -453,13 +770,15 @@ void Cube::initImGUI() {
 	if (remove && m_instCount) {
 		--m_instCount;
 	}
+	m_updateCullParams = add || remove;
 }
+
 void Cube::initModel(ModelBuffer& modelBuffer, AABB& bb) {
 	bool kitty{ randNormf() > 0.5f };
 	modelBuffer.settings = {
 		randNormf() > 0.5f ? 64.0f : 0.0f,
 		XM_2PI * randNormf(),
-		kitty ? 1.0f : 0.0f,
+		static_cast<float>(kitty),
 		*reinterpret_cast<float*>(&kitty)
 	};
 
@@ -474,78 +793,4 @@ void Cube::initModel(ModelBuffer& modelBuffer, AABB& bb) {
 	Vector3 diagonal{ diag, 0.5f, diag };
 	bb.vmin = pos - diagonal;
 	bb.vmax = pos + diagonal;
-}
-
-// is box inside
-bool isBoxInside(
-	const Plane frustum[6],
-	const Vector3& bbMin,
-	const Vector3& bbMax
-) {
-	for (int i{}; i < 6; ++i) {
-		Vector4 p{
-			signbit(frustum[i].x) ? bbMin.x : bbMax.x,
-			signbit(frustum[i].y) ? bbMin.y : bbMax.y,
-			signbit(frustum[i].z) ? bbMin.z : bbMax.z,
-			1.0f
-		};
-		if (p.Dot(frustum[i]) < 0.f) {
-			return false;
-		}
-	}
-	return true;
-}
-
-void Cube::cullBoxes(Camera& camera, float aspectRatio) {
-	Vector3 dir{ -1.f * camera.getDir() };
-	Vector3 up{ camera.getUp() };
-	Vector3 right{ camera.getRight() };
-	Vector3 pos{ camera.getPosition() };
-
-	float n{ 0.1f };
-	float f{ 100.0f };
-	float fov{ XM_PI / 3 };
-
-	float x{ n * tanf(fov / 2) };
-	float y{ n * tanf(fov / 2) * aspectRatio };
-
-	Vector3 nearVertices[3]{
-		pos + dir * n - up * y - right * x,
-		pos + dir * n - up * y + right * x,
-		pos + dir * n + up * y + right * x
-	};
-
-	x = f * tanf(fov / 2);
-	y = f * tanf(fov / 2) * aspectRatio;
-
-	Vector3 farVertices[3]{
-		pos + dir * f - up * y - right * x,
-		pos + dir * f + up * y - right * x,
-		pos + dir * f + up * y + right * x
-	};
-
-	Plane frustum[6]{
-		Plane(nearVertices[0], nearVertices[1], nearVertices[2]),
-		Plane(nearVertices[0],  farVertices[0], nearVertices[1]),
-		Plane(nearVertices[2], nearVertices[1],  farVertices[2]),
-		Plane(nearVertices[2],  farVertices[2],  farVertices[1]),
-		Plane(nearVertices[0],  farVertices[1],  farVertices[0]),
-		Plane(farVertices[2],  farVertices[0],  farVertices[1])
-	};
-
-	std::vector<XMINT4> ids(MaxInstances);
-
-	m_instVisCount = 0;
-	for (UINT i{}; i < m_instCount; ++i) {
-		if (isBoxInside(frustum, m_modelBBs[i].vmin, m_modelBBs[i].vmax)) {
-			ids[m_instVisCount++].x = i;
-		}
-	}
-
-	D3D11_MAPPED_SUBRESOURCE subresource;
-	HRESULT hr = m_pDeviceContext->Map(m_pModelBufferInstVis, 0, D3D11_MAP_WRITE_DISCARD, 0, &subresource);
-	ThrowIfFailed(hr);
-
-	memcpy(subresource.pData, ids.data(), sizeof(XMINT4) * m_instVisCount);
-	m_pDeviceContext->Unmap(m_pModelBufferInstVis, 0);
 }

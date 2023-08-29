@@ -140,6 +140,16 @@ HRESULT compileAndCreateShader(
 		}
 
 		*ppShader = pPixelShader;
+	} else if (ext == L"cs") {
+		ID3D11ComputeShader* pComputeShader{};
+		hr = device->CreateComputeShader(
+			pCode->GetBufferPointer(),
+			pCode->GetBufferSize(),
+			nullptr,
+			&pComputeShader
+		);
+		ThrowIfFailed(hr);
+		*ppShader = pComputeShader;
 	}
 
 	hr = SetResourceName(*ppShader, WCSToMBS(path).c_str());

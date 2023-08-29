@@ -37,6 +37,7 @@ class Renderer {
 		DirectX::XMINT4 postProcess{}; // x - use sepia
 		LightSphere::Light lights[10]{};
 		DirectX::SimpleMath::Color ambientColor{};
+		DirectX::SimpleMath::Plane frustum[6]{};
 	} SceneBuffer;
 
 	typedef struct MouseHandler {
