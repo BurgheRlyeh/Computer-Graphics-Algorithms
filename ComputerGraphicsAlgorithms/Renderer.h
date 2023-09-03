@@ -100,8 +100,8 @@ class Renderer {
 	ID3D11RasterizerState* m_pRasterizerState{};
 	ID3D11SamplerState* m_pSampler{};
 
-	ID3D11Texture2D* m_pDepthBuffer{};
-	ID3D11DepthStencilView* m_pDepthBufferDSV{};
+	//ID3D11Texture2D* m_pDepthBuffer{};
+	//ID3D11DepthStencilView* m_pDepthBufferDSV{};
 
 	ID3D11DepthStencilState* m_pDepthState{};
 	ID3D11DepthStencilState* m_pTransDepthState{};

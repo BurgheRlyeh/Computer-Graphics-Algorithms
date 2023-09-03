@@ -254,8 +254,8 @@ bool Renderer::resize(UINT width, UINT height) {
 	}
 
 	SAFE_RELEASE(m_pBackBufferRTV);
-	SAFE_RELEASE(m_pDepthBuffer);
-	SAFE_RELEASE(m_pDepthBufferDSV);
+	//SAFE_RELEASE(m_pDepthBuffer);
+	//SAFE_RELEASE(m_pDepthBufferDSV);
 
 	HRESULT hr{ m_pSwapChain->ResizeBuffers(2, width, height, DXGI_FORMAT_R8G8B8A8_UNORM, 0) };
 	ThrowIfFailed(hr);
@@ -315,10 +315,10 @@ bool Renderer::update() {
 	Matrix p{
 		// Матрица построения перспективы для левой руки
 		XMMatrixPerspectiveLH(
-			2 * farPlane * tanf(fov / 2), // width
-			2 * farPlane * tanf(fov / 2) * aspectRatio,	// height
-			farPlane, // rho to near
-			nearPlane // rho to far
+			2 * nearPlane * tanf(fov / 2), // width
+			2 * nearPlane * tanf(fov / 2) * aspectRatio,	// height
+			nearPlane, // rho to near
+			farPlane // rho to far
 		)
 	};
 
@@ -355,12 +355,13 @@ bool Renderer::render() {
 
 	ID3D11RenderTargetView* views[]{ m_pPostProcess->getBufferRTV()};
 	// привязываем буфер глубины к Output-Merger этапу
-	m_pDeviceContext->OMSetRenderTargets(1, views, m_pDepthBufferDSV);
+	m_pDeviceContext->OMSetRenderTargets(1, views, nullptr);
+	//m_pDeviceContext->OMSetRenderTargets(1, views, m_pDepthBufferDSV);
 
 	static const FLOAT BackColor[4]{ 0.25f, 0.25f, 0.25f, 1.0f };
 	m_pDeviceContext->ClearRenderTargetView(m_pPostProcess->getBufferRTV(), BackColor);
 	// очистка буфера глубины
-	m_pDeviceContext->ClearDepthStencilView(m_pDepthBufferDSV, D3D11_CLEAR_DEPTH, 0.0f, 0);
+	//m_pDeviceContext->ClearDepthStencilView(m_pDepthBufferDSV, D3D11_CLEAR_DEPTH, 0.0f, 0);
 
 	D3D11_VIEWPORT viewport{
 		.TopLeftX{},
@@ -388,13 +389,13 @@ bool Renderer::render() {
 
 	m_pCube->cullBoxes(m_pSceneBuffer, m_camera, static_cast<float>(m_height) / m_width);
 
+	m_pSphere->render(m_pSampler, m_pSceneBuffer);
+
 	m_pCube->render(m_pSampler, m_pSceneBuffer);
 
 	if (m_isShowLights) {
 		m_pLightSphere->render(m_pSceneBuffer, m_pDepthState, m_pOpaqueBlendState, m_sceneBuffer.lightCount.x);
 	}
-
-	m_pSphere->render(m_pSampler, m_pSceneBuffer);
 
 	m_pRect->render(
 		m_pSampler,
@@ -470,16 +471,16 @@ HRESULT Renderer::setupBackBuffer() {
 	SAFE_RELEASE(backBuffer);
 	ThrowIfFailed(hr);
 
-	hr = createDepthBuffer();
+	//hr = createDepthBuffer();
 	ThrowIfFailed(hr);
 
-	hr = SetResourceName(m_pDepthBuffer, "DepthBuffer");
+	//hr = SetResourceName(m_pDepthBuffer, "DepthBuffer");
 	ThrowIfFailed(hr);
 
-	hr = m_pDevice->CreateDepthStencilView(m_pDepthBuffer, nullptr, &m_pDepthBufferDSV);
+	//hr = m_pDevice->CreateDepthStencilView(m_pDepthBuffer, nullptr, &m_pDepthBufferDSV);
 	ThrowIfFailed(hr);
 
-	hr = SetResourceName(m_pDepthBufferDSV, "DepthBufferView");
+	//hr = SetResourceName(m_pDepthBufferDSV, "DepthBufferView");
 	ThrowIfFailed(hr);
 
 	m_pPostProcess = new PostProcess(m_pDevice, m_pDeviceContext);
@@ -506,7 +507,8 @@ HRESULT Renderer::createDepthBuffer() {
 		.BindFlags{ D3D11_BIND_DEPTH_STENCIL },
 	};
 
-	return m_pDevice->CreateTexture2D(&desc, nullptr, &m_pDepthBuffer);
+	//return m_pDevice->CreateTexture2D(&desc, nullptr, &m_pDepthBuffer);
+	return S_OK;
 }
 
 HRESULT Renderer::initScene() {
@@ -644,8 +646,8 @@ void Renderer::termScene() {
 	SAFE_RELEASE(m_pTransBlendState);
 	SAFE_RELEASE(m_pOpaqueBlendState);
 
-	SAFE_RELEASE(m_pDepthBuffer);
-	SAFE_RELEASE(m_pDepthBufferDSV);
+	//SAFE_RELEASE(m_pDepthBuffer);
+	//SAFE_RELEASE(m_pDepthBufferDSV);
 
 	m_pCube->term();
 	m_pSphere->term();
@@ -665,7 +667,7 @@ HRESULT Renderer::createViewProjectionBuffer() {
 HRESULT Renderer::createRasterizerState() {
 	D3D11_RASTERIZER_DESC desc{
 		.FillMode{ D3D11_FILL_SOLID },
-		.CullMode{ D3D11_CULL_NONE },
+		.CullMode{ D3D11_CULL_BACK },
 		.DepthClipEnable{ TRUE }
 	};
 
