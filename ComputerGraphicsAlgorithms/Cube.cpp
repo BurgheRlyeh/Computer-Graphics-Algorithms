@@ -144,9 +144,6 @@ HRESULT Cube::init(Matrix* positions, int num) {
 
 	// init models
 	{
-		const float diag = sqrtf(2.0f) / 2.0f * 0.9f;
-		Vector3 diagonal{ diag, 0.5f, diag };
-
 		Vector3 pos{ 0.0f, 0.0f, 0.0f };
 
 		int useNM{ 1 };
@@ -154,8 +151,10 @@ HRESULT Cube::init(Matrix* positions, int num) {
 			0.0f, m_modelRotationSpeed, 0.0f, *reinterpret_cast<float*>(&useNM)
 		};
 		m_modelBuffers[0].posAndAng = { 1e-5f, 0.0f, 0.0f, 0.0f };
-		m_modelBBs[0].vmin = pos - diagonal;
-		m_modelBBs[0].vmax = pos + diagonal;
+
+		Vector3 diag{ sqrtf(2.0f), 1.f, sqrtf(2.0f) };
+		m_modelBBs[0].vmin = pos - diag / 2;
+		m_modelBBs[0].vmax = pos + diag / 2;
 
 
 		pos = { 2.0f, 0.0f, 0.0f };
@@ -168,10 +167,6 @@ HRESULT Cube::init(Matrix* positions, int num) {
 		m_modelBBs[1].vmin = pos - Vector3{ 0.5f, 0.5f, 0.5f };
 		m_modelBBs[1].vmax = pos + Vector3{ 0.5f, 0.5f, 0.5f };
 
-		/*for (int i{ 2 }; i < 10; ++i) {
-			initModel(m_modelBuffers[i], m_modelBBs[i]);
-		}
-		m_instCount = 10;*/
 		m_updateCullParams = true;
 	}
 
@@ -472,18 +467,19 @@ HRESULT Cube::initCull() {
 
 	// create indirect args buffer (for calculation)
 	{
-		D3D11_BUFFER_DESC desc{
-			.ByteWidth{ sizeof(D3D11_DRAW_INDEXED_INSTANCED_INDIRECT_ARGS) },
-			.Usage{ D3D11_USAGE_DEFAULT },
-			.BindFlags{ D3D11_BIND_UNORDERED_ACCESS },
-			.CPUAccessFlags{},
-			.MiscFlags{ D3D11_RESOURCE_MISC_BUFFER_STRUCTURED },
-			.StructureByteStride{ sizeof(UINT) }
-		};
+D3D11_BUFFER_DESC desc{
+	.ByteWidth{ sizeof(D3D11_DRAW_INDEXED_INSTANCED_INDIRECT_ARGS) },
+	.Usage{ D3D11_USAGE_DEFAULT },
+	// для unordered access
+	.BindFlags{ D3D11_BIND_UNORDERED_ACCESS },
+	// структурированный буфер
+	.MiscFlags{ D3D11_RESOURCE_MISC_BUFFER_STRUCTURED },
+	.StructureByteStride{ sizeof(UINT) }
+};
 
-		hr = m_pDevice->CreateBuffer(
-			&desc, nullptr, &m_pIndirectArgsSrc
-		);
+hr = m_pDevice->CreateBuffer(
+	&desc, nullptr, &m_pIndirectArgsSrc
+);
 		ThrowIfFailed(hr);
 
 		hr = SetResourceName(m_pIndirectArgsSrc, "IndirectArgsSrc");
@@ -492,13 +488,10 @@ HRESULT Cube::initCull() {
 		D3D11_UNORDERED_ACCESS_VIEW_DESC uavDesc{
 			.Format{ DXGI_FORMAT_UNKNOWN },
 			.ViewDimension{ D3D11_UAV_DIMENSION_BUFFER },
-			.Buffer{
-				.FirstElement{},
-				.NumElements{
-					sizeof(D3D11_DRAW_INDEXED_INSTANCED_INDIRECT_ARGS) / sizeof(UINT)
-				},
-				.Flags{}
-			}
+			.Buffer{ .NumElements{
+				sizeof(D3D11_DRAW_INDEXED_INSTANCED_INDIRECT_ARGS) 
+					/ sizeof(UINT)
+			} }
 		};
 
 		hr = m_pDevice->CreateUnorderedAccessView(
@@ -512,16 +505,13 @@ HRESULT Cube::initCull() {
 
 	// create indirect args buffer (for usage)
 	{
-		D3D11_BUFFER_DESC desc{
-			.ByteWidth{ sizeof(D3D11_DRAW_INDEXED_INSTANCED_INDIRECT_ARGS) },
-			.Usage{ D3D11_USAGE_DEFAULT },
-			.BindFlags{},
-			.CPUAccessFlags{},
-			.MiscFlags{ D3D11_RESOURCE_MISC_DRAWINDIRECT_ARGS },
-			.StructureByteStride{}
-		};
+D3D11_BUFFER_DESC desc{
+	.ByteWidth{ sizeof(D3D11_DRAW_INDEXED_INSTANCED_INDIRECT_ARGS) },
+	.Usage{ D3D11_USAGE_DEFAULT },
+	.MiscFlags{ D3D11_RESOURCE_MISC_DRAWINDIRECT_ARGS },
+};
 
-		hr = m_pDevice->CreateBuffer(&desc, nullptr, &m_pIndirectArgs);
+hr = m_pDevice->CreateBuffer(&desc, nullptr, &m_pIndirectArgs);
 		ThrowIfFailed(hr);
 
 		hr = SetResourceName(m_pIndirectArgsSrc, "IndirectArgs");
@@ -548,7 +538,6 @@ HRESULT Cube::initCull() {
 			.ByteWidth{ sizeof(XMINT4) * MaxInstances },
 			.Usage{ D3D11_USAGE_DEFAULT },
 			.BindFlags{ D3D11_BIND_UNORDERED_ACCESS },
-			.CPUAccessFlags{},
 			.MiscFlags{ D3D11_RESOURCE_MISC_BUFFER_STRUCTURED },
 			.StructureByteStride{ sizeof(XMINT4) }
 		};
@@ -562,14 +551,12 @@ HRESULT Cube::initCull() {
 		D3D11_UNORDERED_ACCESS_VIEW_DESC uavDesc{
 			.Format{ DXGI_FORMAT_UNKNOWN },
 			.ViewDimension{ D3D11_UAV_DIMENSION_BUFFER },
-			.Buffer{
-				.FirstElement{},
-				.NumElements{ MaxInstances },
-				.Flags{}
-			}
+			.Buffer{ 0, MaxInstances, 0 }
 		};
 
-		hr = m_pDevice->CreateUnorderedAccessView(m_pModelBufferInstVisGPU, &uavDesc, &m_pModelBufferInstVisGPU_UAV);
+		hr = m_pDevice->CreateUnorderedAccessView(
+			m_pModelBufferInstVisGPU, &uavDesc, &m_pModelBufferInstVisGPU_UAV
+		);
 		ThrowIfFailed(hr);
 
 		hr = SetResourceName(m_pIndirectArgsSrc, "ModelBufferInstVisGPU_UAV");
@@ -577,10 +564,7 @@ HRESULT Cube::initCull() {
 	}
 
 	{
-		D3D11_QUERY_DESC desc{
-			.Query{ D3D11_QUERY_PIPELINE_STATISTICS },
-			.MiscFlags{}
-		};
+		D3D11_QUERY_DESC desc{ D3D11_QUERY_PIPELINE_STATISTICS };
 		for (int i{}; i < 10 && SUCCEEDED(hr); ++i) {
 			hr = m_pDevice->CreateQuery(&desc, &m_queries[i]);
 		}
@@ -662,12 +646,14 @@ void Cube::updateCullParams() {
 // is box inside
 bool isBoxInside(const Plane frustum[6], const Vector3& bbMin, const Vector3& bbMax) {
 	for (int i{}; i < 6; ++i) {
+		// выбираем ближайшую точку
 		Vector4 p{
 			signbit(frustum[i].x) ? bbMin.x : bbMax.x,
 			signbit(frustum[i].y) ? bbMin.y : bbMax.y,
 			signbit(frustum[i].z) ? bbMin.z : bbMax.z,
 			1.f
 		};
+		// если снаружи - false
 		if (p.Dot(frustum[i]) < 0.f) {
 			return false;
 		}
@@ -677,21 +663,12 @@ bool isBoxInside(const Plane frustum[6], const Vector3& bbMin, const Vector3& bb
 
 void Cube::cullBoxes(ID3D11Buffer* m_pSceneBuffer, Camera& camera, float aspectRatio) {
 	if (m_computeCull) {
-		D3D11_DRAW_INDEXED_INSTANCED_INDIRECT_ARGS args{
-			.IndexCountPerInstance{ 36 },
-			.InstanceCount{},
-			.StartIndexLocation{},
-			.BaseVertexLocation{},
-			.StartInstanceLocation{}
-		};
+		D3D11_DRAW_INDEXED_INSTANCED_INDIRECT_ARGS args{ 36 };
+		m_pDeviceContext->UpdateSubresource(
+			m_pIndirectArgsSrc, 0, nullptr, &args, 0, 0
+		);
 
-		m_pDeviceContext->UpdateSubresource(m_pIndirectArgsSrc, 0, nullptr, &args, 0, 0);
-	
-		UINT groupNumber = DivUp(m_instCount, 64u);
-
-		ID3D11Buffer* constBuffers[2]{
-			m_pSceneBuffer, m_pCullParams
-		};
+		ID3D11Buffer* constBuffers[2]{ m_pSceneBuffer, m_pCullParams };
 		m_pDeviceContext->CSSetConstantBuffers(0, 2, constBuffers);
 
 		ID3D11UnorderedAccessView* uavBuffers[2]{
@@ -700,8 +677,9 @@ void Cube::cullBoxes(ID3D11Buffer* m_pSceneBuffer, Camera& camera, float aspectR
 		m_pDeviceContext->CSSetUnorderedAccessViews(0, 2, uavBuffers, nullptr);
 
 		m_pDeviceContext->CSSetShader(m_pCullShader, nullptr, 0);
-		m_pDeviceContext->Dispatch(groupNumber, 1, 1);
+		m_pDeviceContext->Dispatch((m_instCount - 1) / 64u + 1, 1, 1);
 		m_pDeviceContext->CopyResource(m_pModelBufferInstVis, m_pModelBufferInstVisGPU);
+		m_pDeviceContext->CopyResource(m_pIndirectArgs, m_pIndirectArgsSrc);
 	}
 	else {
 		Plane frustum[6];
@@ -755,8 +733,11 @@ void Cube::initImGUI() {
 	} else {
 		ImGui::Text("Visible %d", m_instVisCount);
 	}
+	m_doCull |= m_computeCull;
 	ImGui::Checkbox("Cull", &m_doCull);
-	ImGui::Checkbox("Cull on GPU", &m_computeCull);
+	if (m_doCull) {
+		ImGui::Checkbox("Cull on GPU", &m_computeCull);
+	}
 
 	ImGui::End();
 
@@ -789,8 +770,7 @@ void Cube::initModel(ModelBuffer& modelBuffer, AABB& bb) {
 	};
 	modelBuffer.posAndAng = { pos.x, pos.y, pos.z, 0.0f };
 
-	const float diag = sqrtf(2.0f) / 2.0f * 0.5f;
-	Vector3 diagonal{ diag, 0.5f, diag };
-	bb.vmin = pos - diagonal;
-	bb.vmax = pos + diagonal;
+	Vector3 diag{ sqrtf(2.0f), 1.f, sqrtf(2.0f) };
+	bb.vmin = pos - diag / 2;
+	bb.vmax = pos + diag / 2;
 }

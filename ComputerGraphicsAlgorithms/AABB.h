@@ -4,15 +4,11 @@
 
 struct AABB {
     DirectX::SimpleMath::Vector3 vmin{
-        (std::numeric_limits<float>::max)(),
-        (std::numeric_limits<float>::max)(),
-        (std::numeric_limits<float>::max)()
+        INFINITY, INFINITY, INFINITY
     };
 
     DirectX::SimpleMath::Vector3 vmax{
-        std::numeric_limits<float>::lowest(),
-        std::numeric_limits<float>::lowest(),
-        std::numeric_limits<float>::lowest()
+        -INFINITY, -INFINITY, -INFINITY
     };
 
     inline DirectX::SimpleMath::Vector3 getVert(int idx) const {
