@@ -43,7 +43,7 @@ struct VSOutput {
 VSOutput vs(VSInput vertex) {
     VSOutput result;
 
-    unsigned int idx = lightCount.w == 1 ? ids[vertex.instanceId].x : vertex.instanceId;
+    unsigned int idx = lightsBumpNormsCull.w == 1 ? ids[vertex.instanceId].x : vertex.instanceId;
 
     float4 worldPos = mul(modelBuffer[idx].model, float4(vertex.pos, 1.0));
 

@@ -39,53 +39,53 @@ void Renderer::MouseHandler::mouseWheel(int delta) {
 
 void Renderer::KeyboardHandler::keyPressed(int keyCode) {
 	switch (keyCode) {
-		case ' ':
-			renderer.m_isModelRotate = !renderer.m_isModelRotate;
-			break;
+	case ' ':
+		renderer.m_isModelRotate = !renderer.m_isModelRotate;
+		break;
 
-		case 'W':
-		case 'w':
-			camera.dForward -= panSpeed;
-			break;
+	case 'W':
+	case 'w':
+		camera.dForward -= panSpeed;
+		break;
 
-		case 'S':
-		case 's':
-			camera.dForward += panSpeed;
-			break;
+	case 'S':
+	case 's':
+		camera.dForward += panSpeed;
+		break;
 
-		case 'D':
-		case 'd':
-			camera.dRight -= panSpeed;
-			break;
+	case 'D':
+	case 'd':
+		camera.dRight -= panSpeed;
+		break;
 
-		case 'A':
-		case 'a':
-			camera.dRight += panSpeed;
-			break;
+	case 'A':
+	case 'a':
+		camera.dRight += panSpeed;
+		break;
 	}
 }
 
 void Renderer::KeyboardHandler::keyReleased(int keyCode) {
 	switch (keyCode) {
-		case 'W':
-		case 'w':
-			renderer.m_camera.dForward += panSpeed;
-			break;
+	case 'W':
+	case 'w':
+		renderer.m_camera.dForward += panSpeed;
+		break;
 
-		case 'S':
-		case 's':
-			renderer.m_camera.dForward -= panSpeed;
-			break;
+	case 'S':
+	case 's':
+		renderer.m_camera.dForward -= panSpeed;
+		break;
 
-		case 'D':
-		case 'd':
-			renderer.m_camera.dRight += panSpeed;
-			break;
+	case 'D':
+	case 'd':
+		renderer.m_camera.dRight += panSpeed;
+		break;
 
-		case 'A':
-		case 'a':
-			renderer.m_camera.dRight -= panSpeed;
-			break;
+	case 'A':
+	case 'a':
+		renderer.m_camera.dRight -= panSpeed;
+		break;
 	}
 }
 
@@ -132,7 +132,7 @@ bool Renderer::init(HWND hWnd) {
 		ImGui_ImplWin32_Init(hWnd);
 		ImGui_ImplDX11_Init(m_pDevice, m_pDeviceContext);
 
-		m_sceneBuffer.lightCount.x = 1;
+		m_sceneBuffer.lightsBumpNormsCull.x = 1;
 		m_sceneBuffer.lights[0].pos = { 1.1f, 1.0f, 0.0f, 1.0f };
 		m_sceneBuffer.lights[0].color = { 1.0f, 1.0f, 0.0f, 0.0f };
 		m_sceneBuffer.ambientColor = { 0.15f, 0.15f, 0.15f, 1.0f };
@@ -224,8 +224,7 @@ HRESULT Renderer::createDeviceAndSwapChain(HWND hWnd, IDXGIAdapter* adapter) {
 		.BufferCount{ 2 },	// количество буфферов для рисования
 		.OutputWindow{ hWnd },	// окно
 		.Windowed{ true },	// исходный режим
-		.SwapEffect{ DXGI_SWAP_EFFECT_DISCARD }, // алгоритм смены текстур (копирование оконным менеджером или нет)
-		.Flags{}	// флажки
+		.SwapEffect{ DXGI_SWAP_EFFECT_DISCARD },
 	};
 
 	HRESULT hr{ D3D11CreateDeviceAndSwapChain(
@@ -254,8 +253,8 @@ bool Renderer::resize(UINT width, UINT height) {
 	}
 
 	SAFE_RELEASE(m_pBackBufferRTV);
-	//SAFE_RELEASE(m_pDepthBuffer);
-	//SAFE_RELEASE(m_pDepthBufferDSV);
+	SAFE_RELEASE(m_pDepthBuffer);
+	SAFE_RELEASE(m_pDepthBufferDSV);
 
 	HRESULT hr{ m_pSwapChain->ResizeBuffers(2, width, height, DXGI_FORMAT_R8G8B8A8_UNORM, 0) };
 	ThrowIfFailed(hr);
@@ -271,7 +270,7 @@ bool Renderer::resize(UINT width, UINT height) {
 	float fov{ XM_PI / 3 };
 	float halfW{ n * tanf(fov / 2) };
 	float halfH{ static_cast<float>(height / width * halfW) };
-	
+
 	float r{ 1.1f * 2.0f * sqrtf(n * n + halfH * halfH + halfW * halfW) };
 
 	m_pSphere->resize(r);
@@ -294,7 +293,7 @@ bool Renderer::update() {
 	m_pCube->update((time - m_prevTime) / 1e6f, m_isModelRotate);
 
 	// Move light bulb spheres
-	m_pLightSphere->update(m_sceneBuffer.lights, m_sceneBuffer.lightCount.x);
+	m_pLightSphere->update(m_sceneBuffer.lights, m_sceneBuffer.lightsBumpNormsCull.x);
 
 	m_prevTime = time;
 
@@ -312,15 +311,22 @@ bool Renderer::update() {
 	float fov{ XM_PI / 3 };
 	float aspectRatio{ static_cast<float>(m_height) / m_width };
 
-	Matrix p{
-		// Матрица построения перспективы для левой руки
-		XMMatrixPerspectiveLH(
+	Matrix p{};
+	if (m_sceneBuffer.sepiaCubemapZbuf.z) {
+		p = XMMatrixPerspectiveLH(
+			2 * farPlane * tanf(fov / 2), // width
+			2 * farPlane * tanf(fov / 2) * aspectRatio,	// height
+			farPlane, // rho to near
+			nearPlane // rho to far
+		);
+	} else {
+		p = XMMatrixPerspectiveLH(
 			2 * nearPlane * tanf(fov / 2), // width
 			2 * nearPlane * tanf(fov / 2) * aspectRatio,	// height
 			nearPlane, // rho to near
 			farPlane // rho to far
-		)
-	};
+		);
+	}
 
 	D3D11_MAPPED_SUBRESOURCE subresource;
 	HRESULT hr = m_pDeviceContext->Map(
@@ -339,7 +345,7 @@ bool Renderer::update() {
 		static_cast<float>(m_height) / m_width,
 		m_sceneBuffer.frustum
 	);
-	
+
 	memcpy(subresource.pData, &m_sceneBuffer, sizeof(SceneBuffer));
 
 	m_pDeviceContext->Unmap(m_pSceneBuffer, 0);
@@ -353,48 +359,43 @@ bool Renderer::update() {
 bool Renderer::render() {
 	m_pDeviceContext->ClearState();
 
-	ID3D11RenderTargetView* views[]{ m_pPostProcess->getBufferRTV()};
+	ID3D11RenderTargetView* views[]{ m_pPostProcess->getBufferRTV() };
 	// привязываем буфер глубины к Output-Merger этапу
-	m_pDeviceContext->OMSetRenderTargets(1, views, nullptr);
-	//m_pDeviceContext->OMSetRenderTargets(1, views, m_pDepthBufferDSV);
+	//m_pDeviceContext->OMSetRenderTargets(1, views, nullptr);
+	m_pDeviceContext->OMSetRenderTargets(1, views, m_isUseZBuffer ? m_pDepthBufferDSV : nullptr);
 
 	static const FLOAT BackColor[4]{ 0.25f, 0.25f, 0.25f, 1.0f };
 	m_pDeviceContext->ClearRenderTargetView(m_pPostProcess->getBufferRTV(), BackColor);
 	// очистка буфера глубины
-	//m_pDeviceContext->ClearDepthStencilView(m_pDepthBufferDSV, D3D11_CLEAR_DEPTH, 0.0f, 0);
+	if (m_isUseZBuffer) {
+		m_pDeviceContext->ClearDepthStencilView(m_pDepthBufferDSV, D3D11_CLEAR_DEPTH, 0.0f, 0);
+	}
 
 	D3D11_VIEWPORT viewport{
-		.TopLeftX{},
-		.TopLeftY{},
 		.Width{ static_cast<FLOAT>(m_width) },
 		.Height{ static_cast<FLOAT>(m_height) },
-		.MinDepth{},
 		.MaxDepth{ 1.0f }
 	};
 	m_pDeviceContext->RSSetViewports(1, &viewport);
 
 	D3D11_RECT rect{
-		.left{},
-		.top{},
 		.right{ static_cast<LONG>(m_width) },
 		.bottom{ static_cast<LONG>(m_width) }
 	};
 	m_pDeviceContext->RSSetScissorRects(1, &rect);
-
 	m_pDeviceContext->OMSetDepthStencilState(m_pDepthState, 0);
-
 	m_pDeviceContext->RSSetState(m_pRasterizerState);
-
 	m_pDeviceContext->OMSetBlendState(m_pOpaqueBlendState, nullptr, 0xFFFFFFFF);
 
+	if (m_isShowCubemap) {
+		m_pSphere->render(m_pSampler, m_pSceneBuffer);
+	}
+
 	m_pCube->cullBoxes(m_pSceneBuffer, m_camera, static_cast<float>(m_height) / m_width);
-
-	m_pSphere->render(m_pSampler, m_pSceneBuffer);
-
 	m_pCube->render(m_pSampler, m_pSceneBuffer);
-
+	
 	if (m_isShowLights) {
-		m_pLightSphere->render(m_pSceneBuffer, m_pDepthState, m_pOpaqueBlendState, m_sceneBuffer.lightCount.x);
+		m_pLightSphere->render(m_pSceneBuffer, m_pDepthState, m_pOpaqueBlendState, m_sceneBuffer.lightsBumpNormsCull.x);
 	}
 
 	m_pRect->render(
@@ -409,6 +410,11 @@ bool Renderer::render() {
 
 	m_pCube->readQueries();
 
+	UINT64 startTime = 0;
+	UINT64 endTime = 0;
+	UINT64 frequency = 0;
+	BOOL disjoint = FALSE;
+
 	// Start the Dear ImGui frame
 	ImGui_ImplDX11_NewFrame();
 	ImGui_ImplWin32_NewFrame();
@@ -421,24 +427,28 @@ bool Renderer::render() {
 		ImGui::Checkbox("Use normal maps", &m_isUseNormalMaps);
 		ImGui::Checkbox("Show normals", &m_isShowNormals);
 		ImGui::Checkbox("Use sepia", &m_pPostProcess->m_useSepia);
+		ImGui::Checkbox("Use Z-buffer", &m_isUseZBuffer);
+		ImGui::Checkbox("Show Cubemap", &m_isShowCubemap);
 
-		m_sceneBuffer.lightCount.y = m_isUseNormalMaps ? 1 : 0;
-		m_sceneBuffer.lightCount.z = m_isShowNormals ? 1 : 0;
-		m_sceneBuffer.postProcess.x = m_pPostProcess->m_useSepia ? 1 : 0;
+		m_sceneBuffer.lightsBumpNormsCull.y = m_isUseNormalMaps ? 1 : 0;
+		m_sceneBuffer.lightsBumpNormsCull.z = m_isShowNormals ? 1 : 0;
+		m_sceneBuffer.sepiaCubemapZbuf.x = m_pPostProcess->m_useSepia ? 1 : 0;
+		m_sceneBuffer.sepiaCubemapZbuf.y = m_isShowCubemap ? 1 : 0;
+		m_sceneBuffer.sepiaCubemapZbuf.z = m_isUseZBuffer ? 1 : 0;
 
 		bool add = ImGui::Button("+");
 		ImGui::SameLine();
 		bool remove = ImGui::Button("-");
 
-		if (add && m_sceneBuffer.lightCount.x < 10) {
-			m_sceneBuffer.lights[++m_sceneBuffer.lightCount.x - 1] = LightSphere::Light();
+		if (add && m_sceneBuffer.lightsBumpNormsCull.x < 10) {
+			m_sceneBuffer.lights[++m_sceneBuffer.lightsBumpNormsCull.x - 1] = LightSphere::Light();
 		}
-		if (remove && m_sceneBuffer.lightCount.x > 0) {
-			--m_sceneBuffer.lightCount.x;
+		if (remove && m_sceneBuffer.lightsBumpNormsCull.x > 0) {
+			--m_sceneBuffer.lightsBumpNormsCull.x;
 		}
 
 		char buffer[1024];
-		for (int i = 0; i < m_sceneBuffer.lightCount.x; i++) {
+		for (int i = 0; i < m_sceneBuffer.lightsBumpNormsCull.x; i++) {
 			ImGui::Text("Light %d", i);
 			sprintf_s(buffer, "Pos %d", i);
 			ImGui::DragFloat3(buffer, (float*)&m_sceneBuffer.lights[i].pos, 0.1f, -10.0f, 10.0f);
@@ -449,8 +459,8 @@ bool Renderer::render() {
 		ImGui::End();
 
 		m_pCube->initImGUI();
-		
-		m_sceneBuffer.lightCount.w = static_cast<int>(m_pCube->getIsDoCull());
+
+		m_sceneBuffer.lightsBumpNormsCull.w = static_cast<int>(m_pCube->getIsDoCull());
 	}
 
 	// Rendering
@@ -471,16 +481,16 @@ HRESULT Renderer::setupBackBuffer() {
 	SAFE_RELEASE(backBuffer);
 	ThrowIfFailed(hr);
 
-	//hr = createDepthBuffer();
+	hr = createDepthBuffer();
 	ThrowIfFailed(hr);
 
-	//hr = SetResourceName(m_pDepthBuffer, "DepthBuffer");
+	hr = SetResourceName(m_pDepthBuffer, "DepthBuffer");
 	ThrowIfFailed(hr);
 
-	//hr = m_pDevice->CreateDepthStencilView(m_pDepthBuffer, nullptr, &m_pDepthBufferDSV);
+	hr = m_pDevice->CreateDepthStencilView(m_pDepthBuffer, nullptr, &m_pDepthBufferDSV);
 	ThrowIfFailed(hr);
 
-	//hr = SetResourceName(m_pDepthBufferDSV, "DepthBufferView");
+	hr = SetResourceName(m_pDepthBufferDSV, "DepthBufferView");
 	ThrowIfFailed(hr);
 
 	m_pPostProcess = new PostProcess(m_pDevice, m_pDeviceContext);
@@ -507,8 +517,7 @@ HRESULT Renderer::createDepthBuffer() {
 		.BindFlags{ D3D11_BIND_DEPTH_STENCIL },
 	};
 
-	//return m_pDevice->CreateTexture2D(&desc, nullptr, &m_pDepthBuffer);
-	return S_OK;
+	return m_pDevice->CreateTexture2D(&desc, nullptr, &m_pDepthBuffer);
 }
 
 HRESULT Renderer::initScene() {
@@ -646,8 +655,8 @@ void Renderer::termScene() {
 	SAFE_RELEASE(m_pTransBlendState);
 	SAFE_RELEASE(m_pOpaqueBlendState);
 
-	//SAFE_RELEASE(m_pDepthBuffer);
-	//SAFE_RELEASE(m_pDepthBufferDSV);
+	SAFE_RELEASE(m_pDepthBuffer);
+	SAFE_RELEASE(m_pDepthBufferDSV);
 
 	m_pCube->term();
 	m_pSphere->term();

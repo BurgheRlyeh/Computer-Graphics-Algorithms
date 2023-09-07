@@ -1,8 +1,10 @@
-cbuffer SceneBuffer : register (b0)
-{
-    float4x4 vp;
-    float4 cameraPos;
-};
+//cbuffer SceneBuffer : register (b0)
+//{
+//    float4x4 vp;
+//    float4 cameraPos;
+//};
+
+#include "SceneCB.h"
 
 cbuffer GeomBuffer : register (b1)
 {
@@ -28,7 +30,9 @@ VSOutput vs(VSInput vertex)
     float3 pos = cameraPos.xyz + vertex.pos * size.x;
 
     result.pos = mul(vp, mul(model, float4(pos, 1.0)));
-    //result.pos.z = 0;
+    if (sepiaCubemapZbuf.z == 1) {
+        result.pos.z = 0;
+    }
     result.localPos = vertex.pos;
 
     return result;

@@ -33,8 +33,8 @@ class Renderer {
 	typedef struct SceneBuffer {
 		DirectX::SimpleMath::Matrix vp{};
 		DirectX::SimpleMath::Vector4 cameraPos{};
-		DirectX::XMINT4 lightCount{};
-		DirectX::XMINT4 postProcess{}; // x - use sepia
+		DirectX::XMINT4 lightsBumpNormsCull{};
+		DirectX::XMINT4 sepiaCubemapZbuf{}; // x - use sepia
 		LightSphere::Light lights[10]{};
 		DirectX::SimpleMath::Color ambientColor{};
 		DirectX::SimpleMath::Plane frustum[6]{};
@@ -100,8 +100,9 @@ class Renderer {
 	ID3D11RasterizerState* m_pRasterizerState{};
 	ID3D11SamplerState* m_pSampler{};
 
-	//ID3D11Texture2D* m_pDepthBuffer{};
-	//ID3D11DepthStencilView* m_pDepthBufferDSV{};
+	ID3D11Texture2D* m_pDepthBuffer{};
+	ID3D11DepthStencilView* m_pDepthBufferDSV{};
+	bool m_isUseZBuffer{ true };
 
 	ID3D11DepthStencilState* m_pDepthState{};
 	ID3D11DepthStencilState* m_pTransDepthState{};
@@ -123,6 +124,7 @@ class Renderer {
 	bool m_isShowNormals{};
 	bool m_isUseAmbient{ true };
 	bool m_useSepia{};
+	bool m_isShowCubemap{ true };
 
 public:
 	MouseHandler m_mouseHandler;

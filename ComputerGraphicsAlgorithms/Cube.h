@@ -76,9 +76,11 @@ private:
     ID3D11Buffer* m_pModelBufferInstVisGPU{};
     ID3D11UnorderedAccessView* m_pModelBufferInstVisGPU_UAV{};
     ID3D11UnorderedAccessView* m_pIndirectArgsUAV{};
+
     ID3D11Query* m_queries[10]{};
     UINT64 m_curFrame{};
     UINT64 m_lastCompletedFrame{};
+
     bool m_computeCull{};
     bool m_updateCullParams{};
     int m_gpuVisibleInstances{};
@@ -122,59 +124,3 @@ private:
     void initModel(ModelBuffer& modelBuffer, AABB& bb);
 
 };
-
-//struct Light {
-//    float4 pos;
-//    float4 color;
-//};
-
-//cbuffer SceneBuffer: register(b0) {
-//    float4x4 vp;
-//    float4 cameraPos;
-//    int4 lightCount;
-//    int4 postProcess;
-//    Light lights[10];
-//    float4 ambientColor;
-//    float4 frustum[6];  // frustum planes
-//};
-
-//cbuffer CullParams: register(b1) {
-//    uint4 numShapes; // x - objects count
-//    float4 bbMin[100];  // aabb min points
-//    float4 bbMax[100];  // aabb max points
-//};
-
-//// 
-//RWStructuredBuffer<uint> indirectArgs: register(u0);
-
-//// индексы моделей для рисования
-//RWStructuredBuffer<uint4> objectIds: register(u1);
-
-//bool IsBoxInside(in float4 frustum[6], in float3 bbMin, in float3 bbMax) {
-//    for (int i = 0; i < 6; i++) {
-//        float4 p = float4(
-//            frustum[i].x < 0 ? bbMin.x : bbMax.x,
-//            frustum[i].y < 0 ? bbMin.y : bbMax.y,
-//            frustum[i].z < 0 ? bbMin.z : bbMax.z,
-//            1.0
-//        );
-//        if (dot(p, frustum[i]) < 0.0f) {
-//            return false;
-//        }
-//    }
-
-//    return true;
-//}
-
-//[numthreads(64, 1, 1)]  // размер группы
-//void cs(uint3 globalThreadId: SV_DispatchThreadID) {
-//    if (globalThreadId.x >= numShapes.x) {
-//        return;
-//    }
-
-//    if (IsBoxInside(frustum, bbMin[globalThreadId.x].xyz, bbMax[globalThreadId.x].xyz)) {
-//        uint id = 0;
-//        InterlockedAdd(indirectArgs[1], 1, id); // ++indirectArgs
-//        objectIds[id] = uint4(globalThreadId.x, 0, 0, 0);
-//    }
-//}

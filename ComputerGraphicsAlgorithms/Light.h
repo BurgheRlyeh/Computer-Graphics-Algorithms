@@ -4,12 +4,12 @@ float3 CalculateColor(in float3 objColor, in float3 objNormal, in float3 pos, in
 {
     float3 finalColor = ambientColor.xyz * objColor;
 
-    if (lightCount.z > 0)
+    if (lightsBumpNormsCull.z > 0)
     {
         return float3(objNormal * 0.5 + float3(0.5, 0.5, 0.5));
     }
 
-    for (int i = 0; i < lightCount.x; ++i)
+    for (int i = 0; i < lightsBumpNormsCull.x; ++i)
     {
         float3 normal = objNormal;
 

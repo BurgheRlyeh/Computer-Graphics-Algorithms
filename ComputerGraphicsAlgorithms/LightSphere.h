@@ -21,9 +21,17 @@ class LightSphere {
 
 public:
 typedef struct Light {
-	DirectX::SimpleMath::Vector4 pos{};
+	DirectX::SimpleMath::Vector4 pos{
+		7.0f * randNormf() - 3.5f,
+		7.0f * randNormf() - 3.5f,
+		7.0f * randNormf() - 3.5f,
+		0.f
+	};
 	DirectX::SimpleMath::Color color{
-		1.0f, 1.0f, 1.0f, 0.0f
+		randNormf(),
+		randNormf(),
+		randNormf(),
+		0.f
 	};
 } Light;
 

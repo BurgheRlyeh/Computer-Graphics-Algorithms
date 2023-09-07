@@ -232,7 +232,7 @@ void LightSphere::render(
 	int count
 ) {
 	m_pDeviceContext->OMSetBlendState(m_pOpaqueBlendState, nullptr, 0xffffffff);
-	//m_pDeviceContext->OMSetDepthStencilState(m_pDepthState, 0);
+	m_pDeviceContext->OMSetDepthStencilState(m_pDepthState, 0);
 
 	m_pDeviceContext->IASetIndexBuffer(m_pIndexBuffer, DXGI_FORMAT_R16_UINT, 0);
 	ID3D11Buffer* vertexBuffers[] = { m_pVertexBuffer };
