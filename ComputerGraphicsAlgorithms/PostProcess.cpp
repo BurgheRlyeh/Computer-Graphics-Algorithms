@@ -2,6 +2,10 @@
 
 #include "ShaderProcessor.h"
 
+ID3D11Texture2D* PostProcess::getTexture() {
+    return m_pBuffer;
+}
+
 ID3D11RenderTargetView* PostProcess::getBufferRTV() {
     return m_pBufferRTV;
 }
@@ -97,7 +101,7 @@ HRESULT PostProcess::createPostProcessBuffer(int width, int height) {
         .Format{ DXGI_FORMAT_R8G8B8A8_UNORM },
         .SampleDesc{ 1, 0 },
         .Usage{ D3D11_USAGE_DEFAULT },
-        .BindFlags{ D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE }
+        .BindFlags{ D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_UNORDERED_ACCESS }
     };
 
     return m_pDevice->CreateTexture2D(&desc, nullptr, &m_pBuffer);

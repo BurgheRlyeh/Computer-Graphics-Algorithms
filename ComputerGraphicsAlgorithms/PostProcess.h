@@ -20,6 +20,7 @@ public:
         m_pDeviceContext(deviceContext)
     {}
 
+    ID3D11Texture2D* getTexture();
     ID3D11RenderTargetView* getBufferRTV();
 
     HRESULT init();

@@ -30,41 +30,57 @@ bool Cube::getIsDoCull() {
 HRESULT Cube::init(Matrix* positions, int num) {
 	HRESULT hr{ S_OK };
 
+	Vertex vertices[24]{
+		// Bottom face
+		{ { -0.5, -0.5,  0.5 }, {  1,  0,  0 }, {  0, -1,  0 }, { 0, 1 } },
+		{ {  0.5, -0.5,  0.5 }, {  1,  0,  0 }, {  0, -1,  0 }, { 1, 1 } },
+		{ {  0.5, -0.5, -0.5 }, {  1,  0,  0 }, {  0, -1,  0 }, { 1, 0 } },
+		{ { -0.5, -0.5, -0.5 }, {  1,  0,  0 }, {  0, -1,  0 }, { 0, 0 } },
+		// Front face 
+		{ { -0.5,  0.5, -0.5 }, {  1,  0,  0 }, {  0,  1,  0 }, { 0, 1 } },
+		{ {  0.5,  0.5, -0.5 }, {  1,  0,  0 }, {  0,  1,  0 }, { 1, 1 } },
+		{ {  0.5,  0.5,  0.5 }, {  1,  0,  0 }, {  0,  1,  0 }, { 1, 0 } },
+		{ { -0.5,  0.5,  0.5 }, {  1,  0,  0 }, {  0,  1,  0 }, { 0, 0 } },
+		// Top face
+		{ {  0.5, -0.5, -0.5 }, {  0,  0,  1 }, {  1,  0,  0 }, { 0, 1 } },
+		{ {  0.5, -0.5,  0.5 }, {  0,  0,  1 }, {  1,  0,  0 }, { 1, 1 } },
+		{ {  0.5,  0.5,  0.5 }, {  0,  0,  1 }, {  1,  0,  0 }, { 1, 0 } },
+		{ {  0.5,  0.5, -0.5 }, {  0,  0,  1 }, {  1,  0,  0 }, { 0, 0 } },
+		// Back face
+		{ { -0.5, -0.5,  0.5 }, {  0,  0, -1 }, { -1,  0,  0 }, { 0, 1 } },
+		{ { -0.5, -0.5, -0.5 }, {  0,  0, -1 }, { -1,  0,  0 }, { 1, 1 } },
+		{ { -0.5,  0.5, -0.5 }, {  0,  0, -1 }, { -1,  0,  0 }, { 1, 0 } },
+		{ { -0.5,  0.5,  0.5 }, {  0,  0, -1 }, { -1,  0,  0 }, { 0, 0 } },
+		// Right face
+		{ {  0.5, -0.5,  0.5 }, { -1,  0,  0 }, {  0,  0,  1 }, { 0, 1 } },
+		{ { -0.5, -0.5,  0.5 }, { -1,  0,  0 }, {  0,  0,  1 }, { 1, 1 } },
+		{ { -0.5,  0.5,  0.5 }, { -1,  0,  0 }, {  0,  0,  1 }, { 1, 0 } },
+		{ {  0.5,  0.5,  0.5 }, { -1,  0,  0 }, {  0,  0,  1 }, { 0, 0 } },
+		// Left face
+		{ { -0.5, -0.5, -0.5 }, {  1,  0,  0 }, {  0,  0, -1 }, { 0, 1 } },
+		{ {  0.5, -0.5, -0.5 }, {  1,  0,  0 }, {  0,  0, -1 }, { 1, 1 } },
+		{ {  0.5,  0.5, -0.5 }, {  1,  0,  0 }, {  0,  0, -1 }, { 1, 0 } },
+		{ { -0.5,  0.5, -0.5 }, {  1,  0,  0 }, {  0,  0, -1 }, { 0, 0 } }
+	};
+
+	UINT16 indices[36]{
+		 0,	 2,  1,  0,  3,  2,
+		 4,	 6,  5,  4,  7,  6,
+		 8,	10,  9,  8, 11, 10,
+		12, 14, 13, 12, 15, 14,
+		16, 18, 17, 16, 19, 18,
+		20, 22, 21, 20, 23, 22
+	};
+
+	D3D11_INPUT_ELEMENT_DESC InputDesc[]{
+		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "TANGENT", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 24, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+		{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 36, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+	};
+
 	// create vertex buffer
 	{
-		Vertex vertices[24]{
-			// Bottom face
-			{ { -0.5, -0.5,  0.5 }, {  1,  0,  0 }, {  0, -1,  0 }, { 0, 1 } },
-			{ {  0.5, -0.5,  0.5 }, {  1,  0,  0 }, {  0, -1,  0 }, { 1, 1 } },
-			{ {  0.5, -0.5, -0.5 }, {  1,  0,  0 }, {  0, -1,  0 }, { 1, 0 } },
-			{ { -0.5, -0.5, -0.5 }, {  1,  0,  0 }, {  0, -1,  0 }, { 0, 0 } },
-			// Front face 
-			{ { -0.5,  0.5, -0.5 }, {  1,  0,  0 }, {  0,  1,  0 }, { 0, 1 } },
-			{ {  0.5,  0.5, -0.5 }, {  1,  0,  0 }, {  0,  1,  0 }, { 1, 1 } },
-			{ {  0.5,  0.5,  0.5 }, {  1,  0,  0 }, {  0,  1,  0 }, { 1, 0 } },
-			{ { -0.5,  0.5,  0.5 }, {  1,  0,  0 }, {  0,  1,  0 }, { 0, 0 } },
-			// Top face
-			{ {  0.5, -0.5, -0.5 }, {  0,  0,  1 }, {  1,  0,  0 }, { 0, 1 } },
-			{ {  0.5, -0.5,  0.5 }, {  0,  0,  1 }, {  1,  0,  0 }, { 1, 1 } },
-			{ {  0.5,  0.5,  0.5 }, {  0,  0,  1 }, {  1,  0,  0 }, { 1, 0 } },
-			{ {  0.5,  0.5, -0.5 }, {  0,  0,  1 }, {  1,  0,  0 }, { 0, 0 } },
-			// Back face
-			{ { -0.5, -0.5,  0.5 }, {  0,  0, -1 }, { -1,  0,  0 }, { 0, 1 } },
-			{ { -0.5, -0.5, -0.5 }, {  0,  0, -1 }, { -1,  0,  0 }, { 1, 1 } },
-			{ { -0.5,  0.5, -0.5 }, {  0,  0, -1 }, { -1,  0,  0 }, { 1, 0 } },
-			{ { -0.5,  0.5,  0.5 }, {  0,  0, -1 }, { -1,  0,  0 }, { 0, 0 } },
-			// Right face
-			{ {  0.5, -0.5,  0.5 }, { -1,  0,  0 }, {  0,  0,  1 }, { 0, 1 } },
-			{ { -0.5, -0.5,  0.5 }, { -1,  0,  0 }, {  0,  0,  1 }, { 1, 1 } },
-			{ { -0.5,  0.5,  0.5 }, { -1,  0,  0 }, {  0,  0,  1 }, { 1, 0 } },
-			{ {  0.5,  0.5,  0.5 }, { -1,  0,  0 }, {  0,  0,  1 }, { 0, 0 } },
-			// Left face
-			{ { -0.5, -0.5, -0.5 }, {  1,  0,  0 }, {  0,  0, -1 }, { 0, 1 } },
-			{ {  0.5, -0.5, -0.5 }, {  1,  0,  0 }, {  0,  0, -1 }, { 1, 1 } },
-			{ {  0.5,  0.5, -0.5 }, {  1,  0,  0 }, {  0,  0, -1 }, { 1, 0 } },
-			{ { -0.5,  0.5, -0.5 }, {  1,  0,  0 }, {  0,  0, -1 }, { 0, 0 } }
-		};
-
 		hr = createVertexBuffer(vertices, sizeof(vertices) / sizeof(*vertices));
 		ThrowIfFailed(hr);
 
@@ -74,15 +90,6 @@ HRESULT Cube::init(Matrix* positions, int num) {
 
 	// create index buffer
 	{
-		UINT16 indices[36]{
-			 0,	 2,  1,  0,  3,  2,
-			 4,	 6,  5,  4,  7,  6,
-			 8,	10,  9,  8, 11, 10,
-			12, 14, 13, 12, 15, 14,
-			16, 18, 17, 16, 19, 18,
-			20, 22, 21, 20, 23, 22
-		};
-
 		hr = createIndexBuffer(indices, sizeof(indices) / sizeof(*indices));
 		ThrowIfFailed(hr);
 
@@ -112,13 +119,6 @@ HRESULT Cube::init(Matrix* positions, int num) {
 
 	// create input layout
 	{
-		D3D11_INPUT_ELEMENT_DESC InputDesc[]{
-			{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-			{ "TANGENT", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-			{ "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 24, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-			{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 36, D3D11_INPUT_PER_VERTEX_DATA, 0 },
-		};
-
 		hr = m_pDevice->CreateInputLayout(
 			InputDesc,
 			4,
@@ -139,6 +139,18 @@ HRESULT Cube::init(Matrix* positions, int num) {
 		ThrowIfFailed(hr);
 
 		hr = SetResourceName(m_pModelBufferInst, "ModelBufferInst");
+		ThrowIfFailed(hr);
+	}
+
+	// create vertices & indices buffer
+	{
+		D3D11_BUFFER_DESC desc{
+			.ByteWidth{ sizeof(VIBuffer) },
+			.Usage{ D3D11_USAGE_DEFAULT },
+			.BindFlags{ D3D11_BIND_CONSTANT_BUFFER }
+		};
+
+		hr = m_pDevice->CreateBuffer(&desc, nullptr, &m_pVIBuffer);
 		ThrowIfFailed(hr);
 	}
 
@@ -173,7 +185,7 @@ HRESULT Cube::init(Matrix* positions, int num) {
 	// create model visibility buffer
 	{
 		D3D11_BUFFER_DESC desc{
-			.ByteWidth{ sizeof(XMINT4) * MaxInstances },
+			.ByteWidth{ sizeof(XMINT4)* MaxInstances },
 			.Usage{ D3D11_USAGE_DYNAMIC },
 			.BindFlags{ D3D11_BIND_CONSTANT_BUFFER },
 			.CPUAccessFlags{ D3D11_CPU_ACCESS_WRITE }
@@ -192,7 +204,7 @@ HRESULT Cube::init(Matrix* positions, int num) {
 
 		const std::wstring textureName{ L"../Common/Brick.dds" };
 
-		bool ddsRes{ LoadDDS(textureName.c_str(), textureDesc[0])};
+		bool ddsRes{ LoadDDS(textureName.c_str(), textureDesc[0]) };
 		if (ddsRes) {
 			ddsRes = LoadDDS(L"../Common/Kitty.dds", textureDesc[1]);
 		}
@@ -315,7 +327,7 @@ HRESULT Cube::createIndexBuffer(USHORT(&indices)[], UINT numIndices) {
 
 HRESULT Cube::createModelBuffer() {
 	D3D11_BUFFER_DESC desc{
-		.ByteWidth{ sizeof(ModelBuffer) * MaxInstances },
+		.ByteWidth{ sizeof(ModelBuffer)* MaxInstances },
 		.Usage{ D3D11_USAGE_DEFAULT },
 		.BindFlags{ D3D11_BIND_CONSTANT_BUFFER }
 	};
@@ -415,7 +427,7 @@ void Cube::update(float delta, bool isRotate) {
 	m_pDeviceContext->UpdateSubresource(m_pModelBufferInst, 0, nullptr, m_modelBuffers.data(), 0, 0);
 }
 
-void Cube::render(ID3D11SamplerState* pSampler, ID3D11Buffer* pSceneBuffer) {
+void Cube::render(ID3D11SamplerState* pSampler, ID3D11Buffer* pSceneBuffer, ID3D11Buffer* pRTBuffer, int w, int h) {
 	ID3D11SamplerState* samplers[]{ pSampler };
 	m_pDeviceContext->PSSetSamplers(0, 1, samplers);
 
@@ -444,14 +456,65 @@ void Cube::render(ID3D11SamplerState* pSampler, ID3D11Buffer* pSceneBuffer) {
 			m_pDeviceContext->Begin(m_queries[m_curFrame % 10]);
 			m_pDeviceContext->DrawIndexedInstancedIndirect(m_pIndirectArgs, 0);
 			m_pDeviceContext->End(m_queries[m_curFrame++ % 10]);
-		}
-		else {
+		} else {
 			m_pDeviceContext->DrawIndexedInstanced(36, m_instVisCount, 0, 0, 0);
 		}
-	}
-	else {
+	} else {
 		m_pDeviceContext->DrawIndexedInstanced(36, m_instCount, 0, 0, 0);
 	}
+
+	rayTracing(pSceneBuffer, pRTBuffer, w, h);
+	/*ID3D11UnorderedAccessView* nullUav{};
+	m_pDeviceContext->CSSetUnorderedAccessViews(0, 1, &nullUav, nullptr);*/
+
+	/*ID3D11RenderTargetView* nullRtv{};
+	m_pDeviceContext->OMSetRenderTargets(1, &nullRtv, nullptr);*/
+}
+
+void Cube::rayTracingInit(ID3D11Texture2D* texture) {
+	HRESULT hr{ S_OK };
+
+	// create shader
+	hr = compileAndCreateShader(
+		m_pDevice,
+		L"RayCasting.cs",
+		(ID3D11DeviceChild**)&m_pRTShader
+	);
+	ThrowIfFailed(hr);
+
+	// create
+	rayTracingUpdate(texture);
+}
+	
+void Cube::rayTracingUpdate(ID3D11Texture2D* texture) {
+	HRESULT hr{ S_OK };
+
+	D3D11_UNORDERED_ACCESS_VIEW_DESC desc{
+		.Format{ DXGI_FORMAT_UNKNOWN },
+		.ViewDimension{ D3D11_UAV_DIMENSION_TEXTURE2D },
+		.Texture2D{}
+	};
+
+	hr = m_pDevice->CreateUnorderedAccessView(texture, &desc, &m_pRTTexture);
+	ThrowIfFailed(hr);
+
+	hr = SetResourceName(m_pRTTexture, "RayCastingTextureUAV");
+	ThrowIfFailed(hr);
+}
+
+void Cube::rayTracing(ID3D11Buffer* m_pSceneBuffer, ID3D11Buffer* m_pRTBuffer, int width, int height) {
+	ID3D11Buffer* constBuffers[4]{
+		m_pSceneBuffer, m_pModelBufferInst, m_pVIBuffer, m_pRTBuffer
+	};
+	m_pDeviceContext->CSSetConstantBuffers(0, 4, constBuffers);
+
+	ID3D11UnorderedAccessView* uavBuffers[]{
+		m_pRTTexture
+	};
+	m_pDeviceContext->CSSetUnorderedAccessViews(0, 1, uavBuffers, nullptr);
+
+	m_pDeviceContext->CSSetShader(m_pRTShader, nullptr, 0);
+	m_pDeviceContext->Dispatch(width, height, 1);
 }
 
 HRESULT Cube::initCull() {
@@ -467,19 +530,19 @@ HRESULT Cube::initCull() {
 
 	// create indirect args buffer (for calculation)
 	{
-D3D11_BUFFER_DESC desc{
-	.ByteWidth{ sizeof(D3D11_DRAW_INDEXED_INSTANCED_INDIRECT_ARGS) },
-	.Usage{ D3D11_USAGE_DEFAULT },
-	// для unordered access
-	.BindFlags{ D3D11_BIND_UNORDERED_ACCESS },
-	// структурированный буфер
-	.MiscFlags{ D3D11_RESOURCE_MISC_BUFFER_STRUCTURED },
-	.StructureByteStride{ sizeof(UINT) }
-};
+		D3D11_BUFFER_DESC desc{
+			.ByteWidth{ sizeof(D3D11_DRAW_INDEXED_INSTANCED_INDIRECT_ARGS) },
+			.Usage{ D3D11_USAGE_DEFAULT },
+			// для unordered access
+			.BindFlags{ D3D11_BIND_UNORDERED_ACCESS },
+			// структурированный буфер
+			.MiscFlags{ D3D11_RESOURCE_MISC_BUFFER_STRUCTURED },
+			.StructureByteStride{ sizeof(UINT) }
+		};
 
-hr = m_pDevice->CreateBuffer(
-	&desc, nullptr, &m_pIndirectArgsSrc
-);
+		hr = m_pDevice->CreateBuffer(
+			&desc, nullptr, &m_pIndirectArgsSrc
+		);
 		ThrowIfFailed(hr);
 
 		hr = SetResourceName(m_pIndirectArgsSrc, "IndirectArgsSrc");
@@ -489,7 +552,7 @@ hr = m_pDevice->CreateBuffer(
 			.Format{ DXGI_FORMAT_UNKNOWN },
 			.ViewDimension{ D3D11_UAV_DIMENSION_BUFFER },
 			.Buffer{ .NumElements{
-				sizeof(D3D11_DRAW_INDEXED_INSTANCED_INDIRECT_ARGS) 
+				sizeof(D3D11_DRAW_INDEXED_INSTANCED_INDIRECT_ARGS)
 					/ sizeof(UINT)
 			} }
 		};
@@ -505,16 +568,16 @@ hr = m_pDevice->CreateBuffer(
 
 	// create indirect args buffer (for usage)
 	{
-D3D11_BUFFER_DESC desc{
-	.ByteWidth{ sizeof(D3D11_DRAW_INDEXED_INSTANCED_INDIRECT_ARGS) },
-	.Usage{ D3D11_USAGE_DEFAULT },
-	.MiscFlags{ D3D11_RESOURCE_MISC_DRAWINDIRECT_ARGS },
-};
+		D3D11_BUFFER_DESC desc{
+			.ByteWidth{ sizeof(D3D11_DRAW_INDEXED_INSTANCED_INDIRECT_ARGS) },
+			.Usage{ D3D11_USAGE_DEFAULT },
+			.MiscFlags{ D3D11_RESOURCE_MISC_DRAWINDIRECT_ARGS },
+		};
 
-hr = m_pDevice->CreateBuffer(&desc, nullptr, &m_pIndirectArgs);
+		hr = m_pDevice->CreateBuffer(&desc, nullptr, &m_pIndirectArgs);
 		ThrowIfFailed(hr);
 
-		hr = SetResourceName(m_pIndirectArgsSrc, "IndirectArgs");
+		hr = SetResourceName(m_pIndirectArgs, "IndirectArgs");
 		ThrowIfFailed(hr);
 	}
 
@@ -535,7 +598,7 @@ hr = m_pDevice->CreateBuffer(&desc, nullptr, &m_pIndirectArgs);
 	// create output buffer
 	{
 		D3D11_BUFFER_DESC desc{
-			.ByteWidth{ sizeof(XMINT4) * MaxInstances },
+			.ByteWidth{ sizeof(XMINT4)* MaxInstances },
 			.Usage{ D3D11_USAGE_DEFAULT },
 			.BindFlags{ D3D11_BIND_UNORDERED_ACCESS },
 			.MiscFlags{ D3D11_RESOURCE_MISC_BUFFER_STRUCTURED },
@@ -680,8 +743,7 @@ void Cube::cullBoxes(ID3D11Buffer* m_pSceneBuffer, Camera& camera, float aspectR
 		m_pDeviceContext->Dispatch((m_instCount - 1) / 64u + 1, 1, 1);
 		m_pDeviceContext->CopyResource(m_pModelBufferInstVis, m_pModelBufferInstVisGPU);
 		m_pDeviceContext->CopyResource(m_pIndirectArgs, m_pIndirectArgsSrc);
-	}
-	else {
+	} else {
 		Plane frustum[6];
 		calcFrustum(camera, aspectRatio, frustum);
 
@@ -756,11 +818,13 @@ void Cube::initImGUI() {
 
 void Cube::initModel(ModelBuffer& modelBuffer, AABB& bb) {
 	bool kitty{ randNormf() > 0.5f };
+	int useNM = static_cast<int>(!kitty);
+
 	modelBuffer.settings = {
-		randNormf() > 0.5f ? 64.0f : 0.0f,
+		1e2f * randNormf(), //> 0.5f ? 64.0f : 0.0f,
 		XM_2PI * randNormf(),
-		static_cast<float>(kitty),
-		*reinterpret_cast<float*>(&kitty)
+		static_cast<float>(kitty) ,
+		*reinterpret_cast<float*>(&useNM)
 	};
 
 	Vector3 pos{

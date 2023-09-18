@@ -1,10 +1,9 @@
-struct Light
-{
+struct Light {
     float4 pos;
     float4 color;
 };
 
-cbuffer SceneBuffer : register (b0)
+cbuffer SceneBuffer: register (b0)
 {
     float4x4 vp;
     float4 cameraPos; // Camera position

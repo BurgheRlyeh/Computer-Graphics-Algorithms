@@ -92,7 +92,6 @@ void Renderer::KeyboardHandler::keyReleased(int keyCode) {
 bool Renderer::init(HWND hWnd) {
 	HRESULT hr{ S_OK };
 
-	// Create a DirectX graphics interface factory.
 	IDXGIFactory* factory{};
 	hr = CreateDXGIFactory(__uuidof(IDXGIFactory), (void**)&factory);
 	ThrowIfFailed(hr);
@@ -109,11 +108,10 @@ bool Renderer::init(HWND hWnd) {
 	hr = initScene();
 	ThrowIfFailed(hr);
 
-	// initial camera setup
 	m_camera = Camera{
 		.r{ 5.f },
-		.angZ{ -XM_PI / 2 },
-		.angY{  XM_PI / 4 },
+		.angZ{ - XM_PI / 2 },
+		.angY{ XM_PI / 4 },
 	};
 
 	SAFE_RELEASE(adapter);
@@ -183,9 +181,8 @@ IDXGIAdapter* Renderer::selectIDXGIAdapter(IDXGIFactory* factory) {
 		DXGI_ADAPTER_DESC desc;
 		adapter->GetDesc(&desc);
 
-		if (wcscmp(desc.Description, L"Microsoft Basic Render Driver")) {
+		if (wcscmp(desc.Description, L"Microsoft Basic Render Driver"))
 			return adapter;
-		}
 
 		adapter->Release();
 	}
@@ -213,8 +210,8 @@ HRESULT Renderer::createDeviceAndSwapChain(HWND hWnd, IDXGIAdapter* adapter) {
 				.Denominator{ 1 }
 			},
 			.Format{ DXGI_FORMAT_R8G8B8A8_UNORM },	// формат текстур
-			.ScanlineOrdering{ DXGI_MODE_SCANLINE_ORDER_UNSPECIFIED }, // порядок рисования по строк
-			.Scaling{ DXGI_MODE_SCALING_UNSPECIFIED } // масштабирование
+			.ScanlineOrdering{}, // порядок рисования по строк
+			.Scaling{} // масштабирование
 		},
 		.SampleDesc{	// MSAA
 			.Count{ 1 },
@@ -224,7 +221,7 @@ HRESULT Renderer::createDeviceAndSwapChain(HWND hWnd, IDXGIAdapter* adapter) {
 		.BufferCount{ 2 },	// количество буфферов для рисования
 		.OutputWindow{ hWnd },	// окно
 		.Windowed{ true },	// исходный режим
-		.SwapEffect{ DXGI_SWAP_EFFECT_DISCARD },
+		.SwapEffect{},
 	};
 
 	HRESULT hr{ D3D11CreateDeviceAndSwapChain(
@@ -275,6 +272,23 @@ bool Renderer::resize(UINT width, UINT height) {
 
 	m_pSphere->resize(r);
 
+	// rt update
+	m_pCube->rayTracingUpdate(m_pPostProcess->getTexture());
+	
+	D3D11_MAPPED_SUBRESOURCE subres;
+	hr = m_pDeviceContext->Map(
+		m_pRTBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &subres
+	);
+	ThrowIfFailed(hr);
+
+	m_rtBuffer.whnf.x = static_cast<FLOAT>(m_width);
+	m_rtBuffer.whnf.y = static_cast<FLOAT>(m_height);
+
+	memcpy(subres.pData, &m_rtBuffer, sizeof(RTBuffer));
+	m_pDeviceContext->Unmap(m_pRTBuffer, 0);
+
+
+
 	return SUCCEEDED(hr);
 }
 
@@ -314,31 +328,28 @@ bool Renderer::update() {
 	Matrix p{};
 	if (m_sceneBuffer.sepiaCubemapZbuf.z) {
 		p = XMMatrixPerspectiveLH(
-			2 * farPlane * tanf(fov / 2), // width
-			2 * farPlane * tanf(fov / 2) * aspectRatio,	// height
+			2 * farPlane * tanf(fov / 2),
+			2 * farPlane * tanf(fov / 2) * aspectRatio,
 			farPlane, // rho to near
 			nearPlane // rho to far
 		);
 	} else {
 		p = XMMatrixPerspectiveLH(
-			2 * nearPlane * tanf(fov / 2), // width
-			2 * nearPlane * tanf(fov / 2) * aspectRatio,	// height
+			2 * nearPlane * tanf(fov / 2),
+			2 * nearPlane * tanf(fov / 2) * aspectRatio,
 			nearPlane, // rho to near
 			farPlane // rho to far
 		);
 	}
 
-	D3D11_MAPPED_SUBRESOURCE subresource;
+	D3D11_MAPPED_SUBRESOURCE subres;
 	HRESULT hr = m_pDeviceContext->Map(
-		m_pSceneBuffer, // указатель на ресурс
-		0, // номер
-		D3D11_MAP_WRITE_DISCARD, // не сохраняем предыдущее значение
-		0, &subresource
+		m_pSceneBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &subres
 	);
 	ThrowIfFailed(hr);
 
-	//ViewProjectionBuffer& sceneBuffer = *reinterpret_cast<ViewProjectionBuffer*>(subresource.pData);
 	m_sceneBuffer.vp = v * p;
+
 	m_sceneBuffer.cameraPos = { cameraPos.x, cameraPos.y, cameraPos.z, 0.0f };
 	m_pCube->calcFrustum(
 		m_camera,
@@ -346,12 +357,31 @@ bool Renderer::update() {
 		m_sceneBuffer.frustum
 	);
 
-	memcpy(subresource.pData, &m_sceneBuffer, sizeof(SceneBuffer));
+	memcpy(subres.pData, &m_sceneBuffer, sizeof(SceneBuffer));
 
 	m_pDeviceContext->Unmap(m_pSceneBuffer, 0);
 
 	// update culling parameters
 	m_pCube->updateCullParams();
+
+	// rt update
+
+	hr = m_pDeviceContext->Map(
+		m_pRTBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &subres
+	);
+	ThrowIfFailed(hr);
+
+	Matrix vp = v * p;
+	m_rtBuffer.whnf = { 
+		static_cast<float>(m_width),
+		static_cast<float>(m_height),
+		static_cast<float>(nearPlane),
+		static_cast<float>(farPlane),
+	};
+	m_rtBuffer.pvInv = vp.Invert();
+
+	memcpy(subres.pData, &m_rtBuffer, sizeof(RTBuffer));
+	m_pDeviceContext->Unmap(m_pRTBuffer, 0);
 
 	return SUCCEEDED(hr);
 }
@@ -361,7 +391,6 @@ bool Renderer::render() {
 
 	ID3D11RenderTargetView* views[]{ m_pPostProcess->getBufferRTV() };
 	// привязываем буфер глубины к Output-Merger этапу
-	//m_pDeviceContext->OMSetRenderTargets(1, views, nullptr);
 	m_pDeviceContext->OMSetRenderTargets(1, views, m_isUseZBuffer ? m_pDepthBufferDSV : nullptr);
 
 	static const FLOAT BackColor[4]{ 0.25f, 0.25f, 0.25f, 1.0f };
@@ -392,7 +421,9 @@ bool Renderer::render() {
 	}
 
 	m_pCube->cullBoxes(m_pSceneBuffer, m_camera, static_cast<float>(m_height) / m_width);
-	m_pCube->render(m_pSampler, m_pSceneBuffer);
+	m_pCube->render(m_pSampler, m_pSceneBuffer, m_pRTBuffer, m_width, m_height);
+
+	m_pDeviceContext->OMSetRenderTargets(1, views, m_isUseZBuffer ? m_pDepthBufferDSV : nullptr);
 	
 	if (m_isShowLights) {
 		m_pLightSphere->render(m_pSceneBuffer, m_pDepthState, m_pOpaqueBlendState, m_sceneBuffer.lightsBumpNormsCull.x);
@@ -533,13 +564,28 @@ HRESULT Renderer::initScene() {
 	hr = m_pCube->init(positions, 2);
 	ThrowIfFailed(hr);
 
-	// create view-projection buffer
+	// create scene buffer
 	{
-		hr = createViewProjectionBuffer();
+		hr = createSceneBuffer();
 		ThrowIfFailed(hr);
 
 		hr = SetResourceName(m_pSceneBuffer, "SceneBuffer");
 		ThrowIfFailed(hr);
+	}
+
+	// create rt buffer
+	{
+		D3D11_BUFFER_DESC desc{
+			.ByteWidth{ sizeof(RTBuffer) },
+			.Usage{ D3D11_USAGE_DYNAMIC },	// часто собираемся обновлять, храним ближе к CPU
+			.BindFlags{ D3D11_BIND_CONSTANT_BUFFER },
+			.CPUAccessFlags{ D3D11_CPU_ACCESS_WRITE }	// можем писать со стороны CPU  
+		};
+
+		hr = m_pDevice->CreateBuffer(&desc, nullptr, &m_pRTBuffer);
+		ThrowIfFailed(hr);
+
+		hr = SetResourceName(m_pRTBuffer, "RTBuffer");
 	}
 
 	// No culling rasterizer state
@@ -641,6 +687,8 @@ HRESULT Renderer::initScene() {
 	hr = m_pCube->initCull();
 	ThrowIfFailed(hr);
 
+	m_pCube->rayTracingInit(m_pPostProcess->getTexture());
+
 	return hr;
 }
 
@@ -662,7 +710,7 @@ void Renderer::termScene() {
 	m_pSphere->term();
 }
 
-HRESULT Renderer::createViewProjectionBuffer() {
+HRESULT Renderer::createSceneBuffer() {
 	D3D11_BUFFER_DESC desc{
 		.ByteWidth{ sizeof(SceneBuffer) },
 		.Usage{ D3D11_USAGE_DYNAMIC },	// часто собираемся обновлять, храним ближе к CPU
@@ -676,7 +724,7 @@ HRESULT Renderer::createViewProjectionBuffer() {
 HRESULT Renderer::createRasterizerState() {
 	D3D11_RASTERIZER_DESC desc{
 		.FillMode{ D3D11_FILL_SOLID },
-		.CullMode{ D3D11_CULL_BACK },
+		.CullMode{ D3D11_CULL_NONE },
 		.DepthClipEnable{ TRUE }
 	};
 

@@ -34,11 +34,18 @@ class Renderer {
 		DirectX::SimpleMath::Matrix vp{};
 		DirectX::SimpleMath::Vector4 cameraPos{};
 		DirectX::XMINT4 lightsBumpNormsCull{};
-		DirectX::XMINT4 sepiaCubemapZbuf{}; // x - use sepia
+		DirectX::XMINT4 sepiaCubemapZbuf{};
 		LightSphere::Light lights[10]{};
 		DirectX::SimpleMath::Color ambientColor{};
 		DirectX::SimpleMath::Plane frustum[6]{};
 	} SceneBuffer;
+
+	struct RTBuffer {
+		DirectX::SimpleMath::Vector4 whnf{};
+		DirectX::SimpleMath::Matrix pvInv{};
+	};
+	RTBuffer m_rtBuffer{};
+	ID3D11Buffer* m_pRTBuffer{};
 
 	typedef struct MouseHandler {
 		Renderer& renderer;
@@ -102,7 +109,7 @@ class Renderer {
 
 	ID3D11Texture2D* m_pDepthBuffer{};
 	ID3D11DepthStencilView* m_pDepthBufferDSV{};
-	bool m_isUseZBuffer{ true };
+	bool m_isUseZBuffer{  };
 
 	ID3D11DepthStencilState* m_pDepthState{};
 	ID3D11DepthStencilState* m_pTransDepthState{};
@@ -124,7 +131,7 @@ class Renderer {
 	bool m_isShowNormals{};
 	bool m_isUseAmbient{ true };
 	bool m_useSepia{};
-	bool m_isShowCubemap{ true };
+	bool m_isShowCubemap{  };
 
 public:
 	MouseHandler m_mouseHandler;
@@ -152,7 +159,7 @@ private:
 	HRESULT initScene();
 	void termScene();
 
-	HRESULT createViewProjectionBuffer();
+	HRESULT createSceneBuffer();
 	HRESULT createRasterizerState();
 	HRESULT createReversedDepthState();
 	HRESULT createSampler();

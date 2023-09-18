@@ -194,5 +194,13 @@
     <None Include="FrustumCull.cs">
       <Filter>Shaders</Filter>
     </None>
+    <None Include="RayCasting.cs">
+      <Filter>Shaders</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <FxCompile Include="ComputeShader.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
   </ItemGroup>
 </Project>
