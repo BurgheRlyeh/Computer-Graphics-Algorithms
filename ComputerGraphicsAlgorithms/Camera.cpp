@@ -11,9 +11,9 @@ void Camera::move(float delta) {
 
 Vector3 Camera::getDir(float shift) {
     return {
-        cosf(angY + shift) * cosf(angZ),
+        cosf(angY + shift) * cosf(angX),
         sinf(angY + shift),
-        cosf(angY + shift) * sinf(angZ)
+        cosf(angY + shift) * sinf(angX)
     };
 }
 

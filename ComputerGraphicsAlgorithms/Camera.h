@@ -5,7 +5,7 @@
 struct Camera {
 	DirectX::SimpleMath::Vector3 poi{};
 	float r{};
-	float angZ{};
+	float angX{};
 	float angY{};
 
 	float rotationSpeed{ DirectX::XM_2PI };

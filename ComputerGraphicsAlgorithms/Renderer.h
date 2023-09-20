@@ -120,7 +120,7 @@ class Renderer {
 	UINT m_width{ 16 };
 	UINT m_height{ 16 };
 
-	bool m_isModelRotate{ true };
+	bool m_isModelRotate{  };
 
 	size_t m_prevTime{};
 
@@ -132,6 +132,9 @@ class Renderer {
 	bool m_isUseAmbient{ true };
 	bool m_useSepia{};
 	bool m_isShowCubemap{  };
+
+	DirectX::SimpleMath::Matrix m_v{};
+	DirectX::SimpleMath::Matrix m_p{};
 
 public:
 	MouseHandler m_mouseHandler;

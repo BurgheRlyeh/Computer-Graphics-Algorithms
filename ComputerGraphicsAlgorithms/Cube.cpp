@@ -150,7 +150,9 @@ HRESULT Cube::init(Matrix* positions, int num) {
 			.BindFlags{ D3D11_BIND_CONSTANT_BUFFER }
 		};
 
-		hr = m_pDevice->CreateBuffer(&desc, nullptr, &m_pVIBuffer);
+		D3D11_SUBRESOURCE_DATA data{ &m_viBuffer, sizeof(VIBuffer) };
+
+		hr = m_pDevice->CreateBuffer(&desc, &data, &m_pVIBuffer);
 		ThrowIfFailed(hr);
 	}
 
@@ -463,7 +465,9 @@ void Cube::render(ID3D11SamplerState* pSampler, ID3D11Buffer* pSceneBuffer, ID3D
 		m_pDeviceContext->DrawIndexedInstanced(36, m_instCount, 0, 0, 0);
 	}
 
-	rayTracing(pSceneBuffer, pRTBuffer, w, h);
+	if (m_isRayTracing) {
+		rayTracing(pSceneBuffer, pRTBuffer, w, h);
+	}
 	/*ID3D11UnorderedAccessView* nullUav{};
 	m_pDeviceContext->CSSetUnorderedAccessViews(0, 1, &nullUav, nullptr);*/
 
@@ -783,7 +787,13 @@ void Cube::readQueries() {
 }
 
 void Cube::initImGUI() {
+	
+	
+
+
 	ImGui::Begin("Instances");
+
+	ImGui::Checkbox("Use ray tracing", &m_isRayTracing);
 
 	bool add = ImGui::Button("+");
 	ImGui::SameLine();

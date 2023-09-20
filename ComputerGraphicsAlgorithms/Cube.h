@@ -80,7 +80,7 @@ private:
 			{ {  0.5,  0.5, -0.5, 0 }, {  1,  0,  0, 0 }, {  0,  0, -1, 0 }, { 1, 0, 0, 0 } },
 			{ { -0.5,  0.5, -0.5, 0 }, {  1,  0,  0, 0 }, {  0,  0, -1, 0 }, { 0, 0, 0, 0 } }
 		};
-		DirectX::XMINT4 indices[36]{
+		DirectX::XMINT4 indices[12]{
 			{  0,  2,  1, 0 }, {  0,  3,  2, 0 },
 			{  4,  6,  5, 0 }, {  4,  7,  6, 0 },
 			{  8, 10,  9, 0 }, {  8, 11, 10, 0 },
@@ -132,6 +132,7 @@ private:
 	VIBuffer m_viBuffer{};
 	ID3D11Buffer* m_pVIBuffer{};
 	ID3D11ComputeShader* m_pRTShader{};
+	bool m_isRayTracing{};
 
 	ID3D11Query* m_queries[10]{};
 	UINT64 m_curFrame{};
@@ -141,7 +142,7 @@ private:
 	bool m_updateCullParams{};
 	int m_gpuVisibleInstances{};
 
-	UINT m_instCount{ 2 };
+	UINT m_instCount{ 1 };
 	UINT m_instVisCount{ 0 };
 
 	bool m_doCull{ true };

@@ -24,7 +24,7 @@ void Renderer::MouseHandler::mouseMoved(int x, int y) {
 		return;
 	}
 
-	camera.angZ -= camera.rotationSpeed * (x - prevMouseX) / renderer.m_width;
+	camera.angX -= camera.rotationSpeed * (x - prevMouseX) / renderer.m_width;
 	camera.angY += camera.rotationSpeed * (y - prevMouseY) / renderer.m_height;
 	camera.angY = XMMax(camera.angY, 0.1f - XM_PIDIV2);
 	camera.angY = XMMin(camera.angY, XM_PIDIV2 - 0.1f);
@@ -110,8 +110,8 @@ bool Renderer::init(HWND hWnd) {
 
 	m_camera = Camera{
 		.r{ 5.f },
-		.angZ{ - XM_PI / 2 },
-		.angY{ XM_PI / 4 },
+		.angX{  -XM_PI },
+		//.angY{ XM_PI / 4 },
 	};
 
 	SAFE_RELEASE(adapter);
@@ -319,6 +319,7 @@ bool Renderer::update() {
 		m_camera.poi,
 		m_camera.getUp()
 	) };
+	m_v = v;
 
 	float nearPlane{ 0.1f };
 	float farPlane{ 100.0f };
@@ -341,6 +342,7 @@ bool Renderer::update() {
 			farPlane // rho to far
 		);
 	}
+	m_p = p;
 
 	D3D11_MAPPED_SUBRESOURCE subres;
 	HRESULT hr = m_pDeviceContext->Map(
@@ -371,14 +373,18 @@ bool Renderer::update() {
 	);
 	ThrowIfFailed(hr);
 
-	Matrix vp = v * p;
 	m_rtBuffer.whnf = { 
 		static_cast<float>(m_width),
 		static_cast<float>(m_height),
 		static_cast<float>(nearPlane),
 		static_cast<float>(farPlane),
 	};
+	Matrix vp = v * p;
+	Matrix pv = p * v;
+	//m_rtBuffer.pvInv = p.Invert() * v.Invert();
+	//m_rtBuffer.pvInv = v.Invert() * p.Invert();
 	m_rtBuffer.pvInv = vp.Invert();
+	//m_rtBuffer.pvInv = pv.Invert();
 
 	memcpy(subres.pData, &m_rtBuffer, sizeof(RTBuffer));
 	m_pDeviceContext->Unmap(m_pRTBuffer, 0);
@@ -450,6 +456,43 @@ bool Renderer::render() {
 	ImGui_ImplDX11_NewFrame();
 	ImGui_ImplWin32_NewFrame();
 	ImGui::NewFrame();
+
+	{
+		ImGui::Begin("RT CPU");
+
+		XMVECTOR mouseNear = DirectX::XMVectorSet(
+			(float)m_width / 2.f, (float)m_height / 2.f, 0.0f, 0.0f
+		);
+		XMVECTOR mouseFar = DirectX::XMVectorSet(
+			(float)m_width / 2.f, (float)m_height / 2.f, 1.0f, 0.0f
+		);
+		XMVECTOR unprojectedNear = DirectX::XMVector3Unproject(
+			mouseNear, 0, 0, (float)m_width, (float)m_height, 0.1f, 100.f,
+			m_p, m_v, DirectX::XMMatrixIdentity()
+		);
+		XMVECTOR unprojectedFar = DirectX::XMVector3Unproject(
+			mouseFar, 0, 0, (float)m_width, (float)m_height, 0.1f, 100.f,
+			m_p, m_v, DirectX::XMMatrixIdentity()
+		);
+		XMVECTOR result = DirectX::XMVector3Normalize(
+			DirectX::XMVectorSubtract(unprojectedFar, unprojectedNear)
+		);
+
+		Vector3 n = unprojectedNear;
+		Vector3 f = unprojectedFar;
+		Vector3 d = result;
+		
+		Vector3 camPos = m_camera.getPosition();
+		float x = camPos.x - d.x * (camPos.y / d.y);
+		float z = camPos.z - d.z * (camPos.y / d.y);
+
+		ImGui::Text("Near: (%f, %f, %f)", n.x, n.y, n.z);
+		ImGui::Text("Far : (%f, %f, %f)", f.x, f.y, f.z);
+		ImGui::Text("Dir : (%f, %f, %f)", d.x, d.y, d.z);
+		ImGui::Text("Res : (%f, %f, %f)", x, camPos.y, z);
+		
+		ImGui::End();
+	}
 
 	{
 		ImGui::Begin("Lights");
