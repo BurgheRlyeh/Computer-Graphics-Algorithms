@@ -59,10 +59,10 @@
     }\
 }
 
-inline void ThrowIfFailed(HRESULT hr) {
-    if (FAILED(hr)) {
-        throw std::exception();
-    }
+#define THROW_IF_FAILED(hr) {\
+    if (FAILED(hr)) {\
+        throw std::exception();\
+    }\
 }
 
 inline HRESULT SetResourceName(ID3D11DeviceChild* pResource, const std::string& name) {

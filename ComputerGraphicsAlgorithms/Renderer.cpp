@@ -94,19 +94,19 @@ bool Renderer::init(HWND hWnd) {
 
 	IDXGIFactory* factory{};
 	hr = CreateDXGIFactory(__uuidof(IDXGIFactory), (void**)&factory);
-	ThrowIfFailed(hr);
+	THROW_IF_FAILED(hr);
 
 	IDXGIAdapter* adapter{ selectIDXGIAdapter(factory) };
 	assert(adapter);
 
 	hr = createDeviceAndSwapChain(hWnd, adapter);
-	ThrowIfFailed(hr);
+	THROW_IF_FAILED(hr);
 
 	hr = setupBackBuffer();
-	ThrowIfFailed(hr);
+	THROW_IF_FAILED(hr);
 
 	hr = initScene();
-	ThrowIfFailed(hr);
+	THROW_IF_FAILED(hr);
 
 	m_camera = Camera{
 		.r{ 5.f },
@@ -158,7 +158,7 @@ void Renderer::term() {
 	if (m_pDevice) {
 		ID3D11Debug* debug{};
 		HRESULT hr{ m_pDevice->QueryInterface(__uuidof(ID3D11Debug), (void**)&debug) };
-		ThrowIfFailed(hr);
+		THROW_IF_FAILED(hr);
 
 		if (debug->AddRef() != 3) {
 			debug->ReportLiveDeviceObjects(D3D11_RLDO_DETAIL | D3D11_RLDO_IGNORE_INTERNAL);
@@ -239,6 +239,8 @@ HRESULT Renderer::createDeviceAndSwapChain(HWND hWnd, IDXGIAdapter* adapter) {
 		&m_pDeviceContext
 	) };
 
+	THROW_IF_FAILED(hr);
+
 	//assert(level == D3D_FEATURE_LEVEL_11_1);
 
 	return hr;
@@ -254,13 +256,13 @@ bool Renderer::resize(UINT width, UINT height) {
 	SAFE_RELEASE(m_pDepthBufferDSV);
 
 	HRESULT hr{ m_pSwapChain->ResizeBuffers(2, width, height, DXGI_FORMAT_R8G8B8A8_UNORM, 0) };
-	ThrowIfFailed(hr);
+	THROW_IF_FAILED(hr);
 
 	this->m_width = width;
 	this->m_height = height;
 
 	hr = setupBackBuffer();
-	ThrowIfFailed(hr);
+	THROW_IF_FAILED(hr);
 
 	// setup skybox sphere
 	float n{ 0.1f };
@@ -279,7 +281,7 @@ bool Renderer::resize(UINT width, UINT height) {
 	hr = m_pDeviceContext->Map(
 		m_pRTBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &subres
 	);
-	ThrowIfFailed(hr);
+	THROW_IF_FAILED(hr);
 
 	m_rtBuffer.whnf.x = static_cast<FLOAT>(m_width);
 	m_rtBuffer.whnf.y = static_cast<FLOAT>(m_height);
@@ -348,7 +350,7 @@ bool Renderer::update() {
 	HRESULT hr = m_pDeviceContext->Map(
 		m_pSceneBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &subres
 	);
-	ThrowIfFailed(hr);
+	THROW_IF_FAILED(hr);
 
 	m_sceneBuffer.vp = v * p;
 
@@ -371,7 +373,7 @@ bool Renderer::update() {
 	hr = m_pDeviceContext->Map(
 		m_pRTBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &subres
 	);
-	ThrowIfFailed(hr);
+	THROW_IF_FAILED(hr);
 
 	m_rtBuffer.whnf = { 
 		static_cast<float>(m_width),
@@ -549,30 +551,30 @@ HRESULT Renderer::setupBackBuffer() {
 	HRESULT hr{ S_OK };
 
 	hr = m_pSwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID*)&backBuffer);
-	ThrowIfFailed(hr);
+	THROW_IF_FAILED(hr);
 
 	hr = m_pDevice->CreateRenderTargetView(backBuffer, nullptr, &m_pBackBufferRTV);
 	SAFE_RELEASE(backBuffer);
-	ThrowIfFailed(hr);
+	THROW_IF_FAILED(hr);
 
 	hr = createDepthBuffer();
-	ThrowIfFailed(hr);
+	THROW_IF_FAILED(hr);
 
 	hr = SetResourceName(m_pDepthBuffer, "DepthBuffer");
-	ThrowIfFailed(hr);
+	THROW_IF_FAILED(hr);
 
 	hr = m_pDevice->CreateDepthStencilView(m_pDepthBuffer, nullptr, &m_pDepthBufferDSV);
-	ThrowIfFailed(hr);
+	THROW_IF_FAILED(hr);
 
 	hr = SetResourceName(m_pDepthBufferDSV, "DepthBufferView");
-	ThrowIfFailed(hr);
+	THROW_IF_FAILED(hr);
 
 	m_pPostProcess = new PostProcess(m_pDevice, m_pDeviceContext);
 	hr = m_pPostProcess->init();
-	ThrowIfFailed(hr);
+	THROW_IF_FAILED(hr);
 
 	hr = m_pPostProcess->setupBuffer(m_width, m_height);
-	ThrowIfFailed(hr);
+	THROW_IF_FAILED(hr);
 
 	return hr;
 }
@@ -605,15 +607,15 @@ HRESULT Renderer::initScene() {
 	};
 
 	hr = m_pCube->init(positions, 2);
-	ThrowIfFailed(hr);
+	THROW_IF_FAILED(hr);
 
 	// create scene buffer
 	{
 		hr = createSceneBuffer();
-		ThrowIfFailed(hr);
+		THROW_IF_FAILED(hr);
 
 		hr = SetResourceName(m_pSceneBuffer, "SceneBuffer");
-		ThrowIfFailed(hr);
+		THROW_IF_FAILED(hr);
 	}
 
 	// create rt buffer
@@ -626,7 +628,7 @@ HRESULT Renderer::initScene() {
 		};
 
 		hr = m_pDevice->CreateBuffer(&desc, nullptr, &m_pRTBuffer);
-		ThrowIfFailed(hr);
+		THROW_IF_FAILED(hr);
 
 		hr = SetResourceName(m_pRTBuffer, "RTBuffer");
 	}
@@ -634,10 +636,10 @@ HRESULT Renderer::initScene() {
 	// No culling rasterizer state
 	{
 		hr = createRasterizerState();
-		ThrowIfFailed(hr);
+		THROW_IF_FAILED(hr);
 
 		hr = SetResourceName(m_pRasterizerState, "RasterizerState");
-		ThrowIfFailed(hr);
+		THROW_IF_FAILED(hr);
 	}
 
 	// create blend states
@@ -663,26 +665,26 @@ HRESULT Renderer::initScene() {
 		};
 
 		hr = m_pDevice->CreateBlendState(&desc, &m_pTransBlendState);
-		ThrowIfFailed(hr);
+		THROW_IF_FAILED(hr);
 
 		hr = SetResourceName(m_pTransBlendState, "TransBlendState");
-		ThrowIfFailed(hr);
+		THROW_IF_FAILED(hr);
 
 		desc.RenderTarget[0].BlendEnable = FALSE;
 		hr = m_pDevice->CreateBlendState(&desc, &m_pOpaqueBlendState);
-		ThrowIfFailed(hr);
+		THROW_IF_FAILED(hr);
 
 		hr = SetResourceName(m_pOpaqueBlendState, "OpaqueBlendState");
-		ThrowIfFailed(hr);
+		THROW_IF_FAILED(hr);
 	}
 
 	// create reverse depth state
 	{
 		hr = createReversedDepthState();
-		ThrowIfFailed(hr);
+		THROW_IF_FAILED(hr);
 
 		hr = SetResourceName(m_pDepthState, "DephtState");
-		ThrowIfFailed(hr);
+		THROW_IF_FAILED(hr);
 	}
 
 	// create reverse transparent depth state
@@ -695,21 +697,21 @@ HRESULT Renderer::initScene() {
 		};
 
 		hr = m_pDevice->CreateDepthStencilState(&desc, &m_pTransDepthState);
-		ThrowIfFailed(hr);
+		THROW_IF_FAILED(hr);
 
 		hr = SetResourceName(m_pTransDepthState, "TransDepthState");
-		ThrowIfFailed(hr);
+		THROW_IF_FAILED(hr);
 	}
 
 	// create sampler
 	{
 		hr = createSampler();
-		ThrowIfFailed(hr);
+		THROW_IF_FAILED(hr);
 	}
 
 	m_pSphere = new Sphere(m_pDevice, m_pDeviceContext);
 	hr = m_pSphere->init();
-	ThrowIfFailed(hr);
+	THROW_IF_FAILED(hr);
 
 	m_pRect = new Rect(m_pDevice, m_pDeviceContext);
 	Vector3 rectPositions[]{
@@ -721,14 +723,14 @@ HRESULT Renderer::initScene() {
 		{ 0.0f, 0.25f, 1.0f, 0.5f }
 	};
 	hr = m_pRect->init(rectPositions, rectColors, 2);
-	ThrowIfFailed(hr);
+	THROW_IF_FAILED(hr);
 
 	m_pLightSphere = new LightSphere(m_pDevice, m_pDeviceContext);
 	hr = m_pLightSphere->init();
-	ThrowIfFailed(hr);
+	THROW_IF_FAILED(hr);
 
 	hr = m_pCube->initCull();
-	ThrowIfFailed(hr);
+	THROW_IF_FAILED(hr);
 
 	m_pCube->rayTracingInit(m_pPostProcess->getTexture());
 

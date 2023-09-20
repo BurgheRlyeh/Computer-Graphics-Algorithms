@@ -75,19 +75,19 @@ HRESULT LightSphere::init() {
 	// create vertex buffer
 	{
 		hr = createVertexBuffer(vertices);
-		ThrowIfFailed(hr);
+		THROW_IF_FAILED(hr);
 
 		hr = SetResourceName(m_pVertexBuffer, "SmallSphereVertexBuffer");
-		ThrowIfFailed(hr);
+		THROW_IF_FAILED(hr);
 	}
 
 	// create index buffer
 	{
 		hr = createIndexBuffer(indices);
-		ThrowIfFailed(hr);
+		THROW_IF_FAILED(hr);
 
 		hr = SetResourceName(m_pIndexBuffer, "SmallSphereIndexBuffer");
-		ThrowIfFailed(hr);
+		THROW_IF_FAILED(hr);
 	}
 
 	// shaders processing
@@ -100,7 +100,7 @@ HRESULT LightSphere::init() {
 			{},
 			&pVertexShaderCode
 		);
-		ThrowIfFailed(hr);
+		THROW_IF_FAILED(hr);
 
 		hr = compileAndCreateShader(
 			m_pDevice,
@@ -122,22 +122,22 @@ HRESULT LightSphere::init() {
 			pVertexShaderCode->GetBufferSize(),
 			&m_pInputLayout
 		);
-		ThrowIfFailed(hr);
+		THROW_IF_FAILED(hr);
 
 		hr = SetResourceName(m_pInputLayout, "SmallSphereInputLayout");
-		ThrowIfFailed(hr);
+		THROW_IF_FAILED(hr);
 	}
 	SAFE_RELEASE(pVertexShaderCode);
 
 	// create model buffer
 	{
 		hr = createModelBuffer();
-		ThrowIfFailed(hr);
+		THROW_IF_FAILED(hr);
 
 		for (int i{}; i < 10 && SUCCEEDED(hr); ++i) {
 			hr = SetResourceName(m_pModelBuffers[i], "SmallSphereModelBuffer" + i);
 		}
-		ThrowIfFailed(hr);
+		THROW_IF_FAILED(hr);
 	}
 
 	return hr;

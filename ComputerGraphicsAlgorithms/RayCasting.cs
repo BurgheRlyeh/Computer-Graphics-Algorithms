@@ -69,27 +69,16 @@ float3 unproject(float4 v) {
 }
 
 Ray rayGen(uint3 DTid: SV_DispatchThreadID) {
-    float4 pixelNear = float4(DTid.x, DTid.y, 0.f, 0.f);
-    float4 pixelFar = float4(DTid.x, DTid.y, 1.f, 0.f);
-    float3 worldDir = unproject(pixelFar) - unproject(pixelNear);
+    float4 pixelNear = float4(DTid.xy + 0.5f, 0.f, 0.f);
+    float4 pixelFar = float4(DTid.xy + 0.5f, 1.f, 0.f);
+    float3 worldNear = unproject(pixelNear);
+    float3 worldFar = unproject(pixelFar);
 
     Ray ray;
-    ray.origin = cameraPos.xyz;
-    ray.direction = normalize(worldDir);
+    ray.origin = worldNear;
+    ray.direction = normalize(worldFar - worldNear);
     return ray;
 }
-
-//Ray rayGen(uint3 DTid: SV_DispatchThreadID) {
-//    float2 xy = 2.f * (DTid.xy) / whnf.xy - 1.f;
-//    xy.y *= -1;
-//    float4 ndc = float4(xy, 1.f, 1.f);
-//    float4 worldDir = mul(vpInv, ndc);
-
-//    Ray ray;
-//    ray.origin = cameraPos.xyz;
-//    ray.direction = normalize(worldDir);
-//    return ray;
-//}
 
 // Moller-Trumbore Intersection Algorithm
 Intsec rayIntsecTriangle(Ray ray, float3 v0, float3 v1, float3 v2) {
@@ -172,8 +161,13 @@ void cs(uint3 DTid: SV_DispatchThreadID) {
         return;
     }
 
+    Ray dir = rayGen(float3(whnf.xy / 2.f, 1.f));
+    float depth = best.t * dot(ray.direction, dir.direction);
+
     float4 colorNear = float4(1.f, 1.f, 1.f, 1.f);
     float4 colorFar = float4(0.f, 0.f, 0.f, 1.f);
 
-    texOutput[DTid.xy] = lerp(colorNear, colorFar, 1.f - 1 / best.t);
+    float4 finalCl = lerp(colorNear, colorFar, 1.f - 1.f / depth);
+
+    texOutput[DTid.xy] = finalCl;
 }

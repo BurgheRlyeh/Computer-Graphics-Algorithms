@@ -39,10 +39,10 @@ HRESULT Rect::init(Vector3* positions, Vector4* colors, int num) {
     // create vertex buffer
     {
         hr = createVertexBuffer(vertices, sizeof(vertices) / sizeof(*vertices));
-        ThrowIfFailed(hr);
+        THROW_IF_FAILED(hr);
 
         hr = SetResourceName(m_pVertexBuffer, "RectVertexBuffer");
-        ThrowIfFailed(hr);
+        THROW_IF_FAILED(hr);
     }
 
     // create index buffer
@@ -53,10 +53,10 @@ HRESULT Rect::init(Vector3* positions, Vector4* colors, int num) {
         };
 
         hr = createIndexBuffer(indices, sizeof(indices) / sizeof(*indices));
-        ThrowIfFailed(hr);
+        THROW_IF_FAILED(hr);
 
         hr = SetResourceName(m_pIndexBuffer, "RectIndexBuffer");
-        ThrowIfFailed(hr);
+        THROW_IF_FAILED(hr);
     }
 
     // shaders processing
@@ -69,7 +69,7 @@ HRESULT Rect::init(Vector3* positions, Vector4* colors, int num) {
             {},
             &vertexShaderCode
         );
-        ThrowIfFailed(hr);
+        THROW_IF_FAILED(hr);
 
         hr = compileAndCreateShader(
             m_pDevice,
@@ -77,7 +77,7 @@ HRESULT Rect::init(Vector3* positions, Vector4* colors, int num) {
             (ID3D11DeviceChild**)&m_pPixelShader,
             { "USE_LIGHTS" }
         );
-        ThrowIfFailed(hr);
+        THROW_IF_FAILED(hr);
     }
 
     // create input layout
@@ -94,10 +94,10 @@ HRESULT Rect::init(Vector3* positions, Vector4* colors, int num) {
             vertexShaderCode->GetBufferSize(),
             &m_pInputLayout
         );
-        ThrowIfFailed(hr);
+        THROW_IF_FAILED(hr);
 
         hr = SetResourceName(m_pInputLayout, "RectInputLayout");
-        ThrowIfFailed(hr);
+        THROW_IF_FAILED(hr);
     }
     SAFE_RELEASE(vertexShaderCode);
 
@@ -113,10 +113,10 @@ HRESULT Rect::init(Vector3* positions, Vector4* colors, int num) {
         };
 
         hr = createModelBuffer(modelBuffer, idx);
-        ThrowIfFailed(hr);
+        THROW_IF_FAILED(hr);
 
         hr = SetResourceName(m_pModelBuffers[idx], "RectModelBuffer" + idx);
-        ThrowIfFailed(hr);
+        THROW_IF_FAILED(hr);
     }
 
     return hr;

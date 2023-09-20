@@ -74,7 +74,7 @@ int APIENTRY wWinMain(
 				exit = true;
 			}
 		}
-		//OutputDebugString(_T("Render\n"));
+
 		if (renderer->update()) {
 			renderer->render();
 		}

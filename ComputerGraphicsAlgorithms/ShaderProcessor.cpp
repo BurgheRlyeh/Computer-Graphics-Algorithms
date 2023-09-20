@@ -148,7 +148,7 @@ HRESULT compileAndCreateShader(
 			nullptr,
 			&pComputeShader
 		);
-		ThrowIfFailed(hr);
+		THROW_IF_FAILED(hr);
 		*ppShader = pComputeShader;
 	}
 

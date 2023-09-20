@@ -16,12 +16,12 @@ HRESULT PostProcess::init() {
     hr = compileAndCreateShader(
         m_pDevice, L"Sepia.vs", (ID3D11DeviceChild**)&m_pVertexShader
     );
-    ThrowIfFailed(hr);
+    THROW_IF_FAILED(hr);
 
     hr = compileAndCreateShader(
         m_pDevice, L"Sepia.ps", (ID3D11DeviceChild**)&m_pPixelShader
     );
-    ThrowIfFailed(hr);
+    THROW_IF_FAILED(hr);
 
     return hr;
 }
@@ -68,26 +68,26 @@ HRESULT PostProcess::setupBuffer(int width, int height) {
     HRESULT hr{ S_OK };
 
     hr = createPostProcessBuffer(width, height);
-    ThrowIfFailed(hr);
+    THROW_IF_FAILED(hr);
 
     hr = SetResourceName(m_pBuffer, "PostProcessBuffer");
-    ThrowIfFailed(hr);
+    THROW_IF_FAILED(hr);
 
     hr = m_pDevice->CreateRenderTargetView(
         m_pBuffer, nullptr, &m_pBufferRTV
     );
-    ThrowIfFailed(hr);
+    THROW_IF_FAILED(hr);
     
     hr = SetResourceName(m_pBufferRTV, "PostProcessBufferRTV");
-    ThrowIfFailed(hr);
+    THROW_IF_FAILED(hr);
 
     hr = m_pDevice->CreateShaderResourceView(
         m_pBuffer, nullptr, &m_pBufferSRV
     );
-    ThrowIfFailed(hr);
+    THROW_IF_FAILED(hr);
 
     hr = SetResourceName(m_pBufferSRV, "PostProcessBufferSRV");
-    ThrowIfFailed(hr);
+    THROW_IF_FAILED(hr);
 
     return hr;
 }

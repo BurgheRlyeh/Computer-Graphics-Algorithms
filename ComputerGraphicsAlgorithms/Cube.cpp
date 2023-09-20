@@ -82,19 +82,19 @@ HRESULT Cube::init(Matrix* positions, int num) {
 	// create vertex buffer
 	{
 		hr = createVertexBuffer(vertices, sizeof(vertices) / sizeof(*vertices));
-		ThrowIfFailed(hr);
+		THROW_IF_FAILED(hr);
 
 		hr = SetResourceName(m_pVertexBuffer, "CubeVertexBuffer");
-		ThrowIfFailed(hr);
+		THROW_IF_FAILED(hr);
 	}
 
 	// create index buffer
 	{
 		hr = createIndexBuffer(indices, sizeof(indices) / sizeof(*indices));
-		ThrowIfFailed(hr);
+		THROW_IF_FAILED(hr);
 
 		hr = SetResourceName(m_pIndexBuffer, "CubeIndexBuffer");
-		ThrowIfFailed(hr);
+		THROW_IF_FAILED(hr);
 	}
 
 	// shaders processing
@@ -107,14 +107,14 @@ HRESULT Cube::init(Matrix* positions, int num) {
 			{},
 			&vertexShaderCode
 		);
-		ThrowIfFailed(hr);
+		THROW_IF_FAILED(hr);
 
 		hr = compileAndCreateShader(
 			m_pDevice,
 			L"CubeShader.ps",
 			(ID3D11DeviceChild**)&m_pPixelShader
 		);
-		ThrowIfFailed(hr);
+		THROW_IF_FAILED(hr);
 	}
 
 	// create input layout
@@ -126,20 +126,20 @@ HRESULT Cube::init(Matrix* positions, int num) {
 			vertexShaderCode->GetBufferSize(),
 			&m_pInputLayout
 		);
-		ThrowIfFailed(hr);
+		THROW_IF_FAILED(hr);
 
 		hr = SetResourceName(m_pInputLayout, "InputLayout");
-		ThrowIfFailed(hr);
+		THROW_IF_FAILED(hr);
 	}
 	SAFE_RELEASE(vertexShaderCode);
 
 	// create model buffer
 	{
 		hr = createModelBuffer();
-		ThrowIfFailed(hr);
+		THROW_IF_FAILED(hr);
 
 		hr = SetResourceName(m_pModelBufferInst, "ModelBufferInst");
-		ThrowIfFailed(hr);
+		THROW_IF_FAILED(hr);
 	}
 
 	// create vertices & indices buffer
@@ -153,7 +153,7 @@ HRESULT Cube::init(Matrix* positions, int num) {
 		D3D11_SUBRESOURCE_DATA data{ &m_viBuffer, sizeof(VIBuffer) };
 
 		hr = m_pDevice->CreateBuffer(&desc, &data, &m_pVIBuffer);
-		ThrowIfFailed(hr);
+		THROW_IF_FAILED(hr);
 	}
 
 	// init models
@@ -194,10 +194,10 @@ HRESULT Cube::init(Matrix* positions, int num) {
 		};
 
 		hr = m_pDevice->CreateBuffer(&desc, nullptr, &m_pModelBufferInstVis);
-		ThrowIfFailed(hr);
+		THROW_IF_FAILED(hr);
 
 		hr = SetResourceName(m_pModelBufferInstVis, "ModelBufferInstVis");
-		ThrowIfFailed(hr);
+		THROW_IF_FAILED(hr);
 	}
 
 	// load texture and create view 
@@ -245,10 +245,10 @@ HRESULT Cube::init(Matrix* positions, int num) {
 
 		// создание текстуры
 		m_pDevice->CreateTexture2D(&desc, data.data(), &m_pTexture);
-		ThrowIfFailed(hr);
+		THROW_IF_FAILED(hr);
 
 		hr = SetResourceName(m_pTexture, WCSToMBS(L"Diffuse textures"));
-		ThrowIfFailed(hr);
+		THROW_IF_FAILED(hr);
 
 		// resource view для обработки в шейдерах
 		D3D11_SHADER_RESOURCE_VIEW_DESC srvDesc{
@@ -261,10 +261,10 @@ HRESULT Cube::init(Matrix* positions, int num) {
 		};
 
 		hr = m_pDevice->CreateShaderResourceView(m_pTexture, &srvDesc, &m_pTextureView);
-		ThrowIfFailed(hr);
+		THROW_IF_FAILED(hr);
 
 		hr = SetResourceName(m_pTexture, WCSToMBS(L"Diffuse texture views"));
-		ThrowIfFailed(hr);
+		THROW_IF_FAILED(hr);
 
 		for (UINT32 j{}; j < 2; ++j) {
 			free(textureDesc[j].pData);
@@ -280,16 +280,16 @@ HRESULT Cube::init(Matrix* positions, int num) {
 		bool ddsRes{ LoadDDS(textureName.c_str(), textureDesc) };
 
 		hr = createTexture(textureDesc, &m_pTextureNM);
-		ThrowIfFailed(hr);
+		THROW_IF_FAILED(hr);
 
 		hr = SetResourceName(m_pTextureNM, WCSToMBS(textureName));
-		ThrowIfFailed(hr);
+		THROW_IF_FAILED(hr);
 
 		hr = createResourceView(textureDesc, m_pTextureNM, &m_pTextureViewNM);
-		ThrowIfFailed(hr);
+		THROW_IF_FAILED(hr);
 
 		hr = SetResourceName(m_pTexture, "CubeTextureViewNM");
-		ThrowIfFailed(hr);
+		THROW_IF_FAILED(hr);
 
 		free(textureDesc.pData);
 	}
@@ -482,7 +482,7 @@ void Cube::rayTracingInit(ID3D11Texture2D* texture) {
 		L"RayCasting.cs",
 		(ID3D11DeviceChild**)&m_pRTShader
 	) };
-	ThrowIfFailed(hr);
+	THROW_IF_FAILED(hr);
 
 	// create
 	rayTracingUpdate(texture);
@@ -498,10 +498,10 @@ void Cube::rayTracingUpdate(ID3D11Texture2D* tex) {
 	HRESULT hr{ 
 		m_pDevice->CreateUnorderedAccessView(tex, &desc, &m_pRTTexture)
 	};
-	ThrowIfFailed(hr);
+	THROW_IF_FAILED(hr);
 
 	hr = SetResourceName(m_pRTTexture, "RayCastingTextureUAV");
-	ThrowIfFailed(hr);
+	THROW_IF_FAILED(hr);
 }
 
 void Cube::rayTracing(ID3D11Buffer* m_pSBuf, ID3D11Buffer* m_pRTBuf, int w, int h) {
@@ -526,7 +526,7 @@ HRESULT Cube::initCull() {
 		L"FrustumCull.cs",
 		(ID3D11DeviceChild**)&m_pCullShader
 	);
-	ThrowIfFailed(hr);
+	THROW_IF_FAILED(hr);
 
 	// create indirect args buffer (for calculation)
 	{
@@ -543,10 +543,10 @@ HRESULT Cube::initCull() {
 		hr = m_pDevice->CreateBuffer(
 			&desc, nullptr, &m_pIndirectArgsSrc
 		);
-		ThrowIfFailed(hr);
+		THROW_IF_FAILED(hr);
 
 		hr = SetResourceName(m_pIndirectArgsSrc, "IndirectArgsSrc");
-		ThrowIfFailed(hr);
+		THROW_IF_FAILED(hr);
 
 		D3D11_UNORDERED_ACCESS_VIEW_DESC uavDesc{
 			.Format{ DXGI_FORMAT_UNKNOWN },
@@ -560,10 +560,10 @@ HRESULT Cube::initCull() {
 		hr = m_pDevice->CreateUnorderedAccessView(
 			m_pIndirectArgsSrc, &uavDesc, &m_pIndirectArgsUAV
 		);
-		ThrowIfFailed(hr);
+		THROW_IF_FAILED(hr);
 
 		hr = SetResourceName(m_pIndirectArgsSrc, "IndirectArgsUAV");
-		ThrowIfFailed(hr);
+		THROW_IF_FAILED(hr);
 	}
 
 	// create indirect args buffer (for usage)
@@ -575,10 +575,10 @@ HRESULT Cube::initCull() {
 		};
 
 		hr = m_pDevice->CreateBuffer(&desc, nullptr, &m_pIndirectArgs);
-		ThrowIfFailed(hr);
+		THROW_IF_FAILED(hr);
 
 		hr = SetResourceName(m_pIndirectArgs, "IndirectArgs");
-		ThrowIfFailed(hr);
+		THROW_IF_FAILED(hr);
 	}
 
 	// create culling params buffer
@@ -590,7 +590,7 @@ HRESULT Cube::initCull() {
 		};
 
 		hr = m_pDevice->CreateBuffer(&desc, nullptr, &m_pCullParams);
-		ThrowIfFailed(hr);
+		THROW_IF_FAILED(hr);
 
 		hr = SetResourceName(m_pCullParams, "CullParams");
 	}
@@ -606,10 +606,10 @@ HRESULT Cube::initCull() {
 		};
 
 		hr = m_pDevice->CreateBuffer(&desc, nullptr, &m_pModelBufferInstVisGPU);
-		ThrowIfFailed(hr);
+		THROW_IF_FAILED(hr);
 
 		hr = SetResourceName(m_pModelBufferInstVisGPU, "ModelBufferInstVisGPU");
-		ThrowIfFailed(hr);
+		THROW_IF_FAILED(hr);
 
 		D3D11_UNORDERED_ACCESS_VIEW_DESC uavDesc{
 			.Format{ DXGI_FORMAT_UNKNOWN },
@@ -620,10 +620,10 @@ HRESULT Cube::initCull() {
 		hr = m_pDevice->CreateUnorderedAccessView(
 			m_pModelBufferInstVisGPU, &uavDesc, &m_pModelBufferInstVisGPU_UAV
 		);
-		ThrowIfFailed(hr);
+		THROW_IF_FAILED(hr);
 
 		hr = SetResourceName(m_pIndirectArgsSrc, "ModelBufferInstVisGPU_UAV");
-		ThrowIfFailed(hr);
+		THROW_IF_FAILED(hr);
 	}
 
 	{
@@ -631,7 +631,7 @@ HRESULT Cube::initCull() {
 		for (int i{}; i < 10 && SUCCEEDED(hr); ++i) {
 			hr = m_pDevice->CreateQuery(&desc, &m_queries[i]);
 		}
-		ThrowIfFailed(hr);
+		THROW_IF_FAILED(hr);
 	}
 
 	return hr;
@@ -758,7 +758,7 @@ void Cube::cullBoxes(ID3D11Buffer* m_pSceneBuffer, Camera& camera, float aspectR
 
 		D3D11_MAPPED_SUBRESOURCE subresource;
 		HRESULT hr = m_pDeviceContext->Map(m_pModelBufferInstVis, 0, D3D11_MAP_WRITE_DISCARD, 0, &subresource);
-		ThrowIfFailed(hr);
+		THROW_IF_FAILED(hr);
 
 		memcpy(subresource.pData, ids.data(), sizeof(XMINT4) * m_instVisCount);
 		m_pDeviceContext->Unmap(m_pModelBufferInstVis, 0);

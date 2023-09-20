@@ -70,19 +70,19 @@ HRESULT Sphere::init() {
 	// create vertex buffer
 	{
 		hr = createVertexBuffer(vertices);
-		ThrowIfFailed(hr);
+		THROW_IF_FAILED(hr);
 
 		hr = SetResourceName(m_pVertexBuffer, "SphereVertexBuffer");
-		ThrowIfFailed(hr);
+		THROW_IF_FAILED(hr);
 	}
 
 	// create index buffer
 	{
 		hr = createIndexBuffer(indices);
-		ThrowIfFailed(hr);
+		THROW_IF_FAILED(hr);
 
 		hr = SetResourceName(m_pIndexBuffer, "SphereIndexBuffer");
-		ThrowIfFailed(hr);
+		THROW_IF_FAILED(hr);
 	}
 
 	// shaders processing
@@ -95,14 +95,14 @@ HRESULT Sphere::init() {
 			{},
 			&sphereVertexShaderCode
 		);
-		ThrowIfFailed(hr);
+		THROW_IF_FAILED(hr);
 
 		hr = compileAndCreateShader(
 			m_pDevice,
 			L"SphereShader.ps",
 			reinterpret_cast<ID3D11DeviceChild**>(&m_pPixelShader)
 		);
-		ThrowIfFailed(hr);
+		THROW_IF_FAILED(hr);
 	}
 
 	// create input layout
@@ -118,20 +118,20 @@ HRESULT Sphere::init() {
 			sphereVertexShaderCode->GetBufferSize(),
 			&m_pInputLayout
 		);
-		ThrowIfFailed(hr);
+		THROW_IF_FAILED(hr);
 
 		hr = SetResourceName(m_pInputLayout, "SphereInputLayout");
-		ThrowIfFailed(hr);
+		THROW_IF_FAILED(hr);
 	}
 	SAFE_RELEASE(sphereVertexShaderCode);
 
 	// create geometry buffer
 	{
 		hr = createModelBuffer();
-		ThrowIfFailed(hr);
+		THROW_IF_FAILED(hr);
 
 		hr = SetResourceName(m_pModelBuffer, "SphereModelBuffer");
-		ThrowIfFailed(hr);
+		THROW_IF_FAILED(hr);
 	}
 
 	// create texture
@@ -148,16 +148,16 @@ HRESULT Sphere::init() {
 		}
 
 		hr = createTexture(texDescs);
-		ThrowIfFailed(hr);
+		THROW_IF_FAILED(hr);
 
 		hr = SetResourceName(m_pCubeMapTexture, "CubemapTexture");
-		ThrowIfFailed(hr);
+		THROW_IF_FAILED(hr);
 	}
 
 	// create resource view
 	{
 		hr = createResourceView(texDescs);
-		ThrowIfFailed(hr);
+		THROW_IF_FAILED(hr);
 	}
 	for (int i = 0; i < 6; i++) {
 		free(texDescs[i].pData);
