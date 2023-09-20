@@ -1,7 +1,6 @@
 #include "SceneCB.h"
 
-struct ModelBuffer
-{
+struct ModelBuffer {
     float4x4 mModel;
     float4x4 mNormTang;
     float4 settings;
@@ -12,8 +11,7 @@ cbuffer ModelBufferInst: register(b1) {
     ModelBuffer modelBuffer[100];
 };
 
-struct Vertex
-{
+struct Vertex {
     float4 position;
     float4 tangent;
     float4 norm;
@@ -27,112 +25,74 @@ cbuffer VIBuffer: register(b2) {
 
 cbuffer RTBuffer: register(b3) {
     float4 whnf;
-    float4x4 pvInv;
+    float4x4 vpInv;
 }
 
-struct Ray
-{
-    int modelID;
-    int triangleID;
+struct Ray {
     float3 origin;
     float3 direction;
-    float3 vec;
 };
 
-struct Intsec
-{
+struct Intsec {
     int modelID;
     int triangleID;
-    float t; // dist
-    // barycentric cs
+    float t;
     float u;
     float v;
 };
 
 RWTexture2D<float4> texOutput: register(u0);
 
-float4 transform(float4 v, float4x4 m)
-{
+// transforms vector & projecting back into w = 1
+float4 transform(float4 v, float4x4 m) {
+    m = transpose(m);
 
-    //m = transpose(m);
+    float4 res =
+        v.xxxx * m[0] +
+        v.yyyy * m[1] +
+        v.zzzz * m[2] + m[3];
 
-    float4 x = float4(v.xxxx);
-    float4 y = float4(v.yyyy);
-    float4 z = float4(v.zzzz);
-
-    float4 c0 = float4(m._11, m._21, m._31, m._41);
-    float4 c1 = float4(m._12, m._22, m._32, m._42);
-    float4 c2 = float4(m._13, m._23, m._33, m._43);
-    float4 c3 = float4(m._14, m._24, m._34, m._44);
-
-
-    float4 res = z * c2 + c3;
-    res = res + y * c1;
-    res = res + x * c0;
-
-    //float4 res = x * c0 + y * c1 + z * c2 + c3;
-
-    res /= res.w;
-
-    return res;
+    return res / res.w;
 }
 
-float4 unproject(float4 v) {
-    float4 d = float4(-1.f, 1.f, 0.f, 0.f);
+// Projects a 3D vector from screen space into world space
+float3 unproject(float4 v) {
+    // to ndc
+    float4 scale = float4(whnf.x / 2, -whnf.y / 2, whnf.w - whnf.z, 1.f);
+    scale = rcp(scale); // per-component reciprocal
 
-    float4 scale = float4(0.5f * whnf.x, -0.5f * whnf.y, whnf.w - whnf.z, 1.f);
-    scale = rcp(scale);
+    // near offset
+    float4 offset = float4(0.f, 0.f, -whnf.z, 0.f);
+    offset = scale * offset + float4(-1.f, 1.f, 0.f, 0.f);
 
-    float4 offset = float4(-0.f, -0.f, -whnf.z, 0.f);
-    offset = scale * offset + d;
-
-    float4x4 trans = pvInv;
-
-    float4 res = v * scale + offset;
-
-    return transform(res, trans);
+    return transform(v * scale + offset, vpInv).xyz;
 }
 
 Ray rayGen(uint3 DTid: SV_DispatchThreadID) {
-    float4 mouseNear = float4(DTid.x, DTid.y, 0.f, 0.f);
-    float4 mouseFar = float4(DTid.x, DTid.y, 1.f, 0.f);
-    //float4 mouseNear = float4(whnf.x / 2.f, whnf.y / 2.f, 0.f, 0.f);
-    //float4 mouseFar = float4(whnf.x / 2.f, whnf.y / 2.f, 1.f, 0.f);
-
-    float4 unprojNear = unproject(mouseNear);
-    float4 unprojFar = unproject(mouseFar);
-
-    float4 res = normalize(unprojFar - unprojNear);
+    float4 pixelNear = float4(DTid.x, DTid.y, 0.f, 0.f);
+    float4 pixelFar = float4(DTid.x, DTid.y, 1.f, 0.f);
+    float3 worldDir = unproject(pixelFar) - unproject(pixelNear);
 
     Ray ray;
-    ray.origin = (cameraPos.xyz);
-    ray.direction = res;
-    ray.vec = ray.direction;
-    return ray;
-}
-
-Ray GenerateRay(uint3 DTid: SV_DispatchThreadID)
-{
-    Ray ray;
-
-    // Calculate NDC in range [-1, 1]
-    float2 xy = 2.f * (DTid.xy + 0.f) / whnf.xy - 1.f;
-    xy.y *= -1;
-
-    float4 ndc = float4(xy, 0.f, 1.f);
-    float4 worldPos = mul(pvInv, ndc);
-    //worldPos.xyz /= worldPos.w;
-    worldPos = normalize(worldPos);
-
     ray.origin = cameraPos.xyz;
-    ray.direction = worldPos.xyz;
-    ray.vec = /*normalize*/(worldPos.xyz - ray.origin);
+    ray.direction = normalize(worldDir);
     return ray;
 }
+
+//Ray rayGen(uint3 DTid: SV_DispatchThreadID) {
+//    float2 xy = 2.f * (DTid.xy) / whnf.xy - 1.f;
+//    xy.y *= -1;
+//    float4 ndc = float4(xy, 1.f, 1.f);
+//    float4 worldDir = mul(vpInv, ndc);
+
+//    Ray ray;
+//    ray.origin = cameraPos.xyz;
+//    ray.direction = normalize(worldDir);
+//    return ray;
+//}
 
 // Moller-Trumbore Intersection Algorithm
-Intsec rayIntsecTriangle(Ray ray, float3 v0, float3 v1, float3 v2)
-{
+Intsec rayIntsecTriangle(Ray ray, float3 v0, float3 v1, float3 v2) {
     Intsec intsec;
     intsec.t = whnf.w;
 
@@ -162,25 +122,24 @@ Intsec rayIntsecTriangle(Ray ray, float3 v0, float3 v1, float3 v2)
         return intsec;
 
     intsec.t = dot(e2, q) / a;
+
+    // ray.origin + t * ray.direction
+
     intsec.u = u;
     intsec.v = v;
     return intsec;
 }
 
-float3 getVertexWorldPos(int id, int mID)
-{
+float3 getVertexWorldPos(int id, int mID) {
     float4 v = float4(vertices[id].position.xyz, 1.f);
     float4 mv = mul(modelBuffer[mID].mModel, v);
-    mv.xyz /= mv.w;
-    return mv.xyz;
+    return mv.xyz / mv.w;
 }
 
 Intsec CalculateIntersection(Ray ray)
 {
     Intsec best;
     best.t = whnf.w;
-
-    const int primitives = 12;
 
     for (int m = 0; m < 10; ++m)
     {
@@ -191,9 +150,6 @@ Intsec CalculateIntersection(Ray ray)
             float3 v2 = getVertexWorldPos(indices[i].z, m);
 
             Intsec curr = rayIntsecTriangle(ray, v0, v1, v2);
-            float t = curr.t;
-            float u = curr.u;
-            float v = curr.v;
 
             if (whnf.z < curr.t && curr.t < best.t)
             {
@@ -207,37 +163,17 @@ Intsec CalculateIntersection(Ray ray)
     return best;
 }
 
-float3 getIntsecPoint(Intsec intsec)
-{
-    int mId = intsec.modelID;
-    int tId = intsec.triangleID;
-
-    float3 v0 = getVertexWorldPos(indices[tId].x, mId);
-    float3 v1 = getVertexWorldPos(indices[tId].y, mId);
-    float3 v2 = getVertexWorldPos(indices[tId].z, mId);
-
-    return v0 + intsec.u * (v1 - v0) + intsec.v * (v2 - v0);
-}
-
-
 [numthreads(1, 1, 1)]
-void cs(uint3 DTid: SV_DispatchThreadID)
-{
-    //Ray ray0 = GenerateRay(DTid);
-    //Intsec best0 = CalculateIntersection(ray0);
+void cs(uint3 DTid: SV_DispatchThreadID) {
+    Ray ray = rayGen(DTid);
+    Intsec best = CalculateIntersection(ray);
 
-    Ray ray1 = rayGen(DTid);
-    Intsec best1 = CalculateIntersection(ray1);
-
-    if (best1.t < whnf.w)
-    {
-        float4 colorNear = float4(1.f, 1.f, 1.f, 1.0f);
-        float4 colorFar = float4(0.f, 0.f, 0.f, 1.0f);
-
-        float depth = 1.f - 1 / best1.t;
-
-        float4 finalColor = lerp(colorNear, colorFar, depth);
-
-        texOutput[DTid.xy] = finalColor;
+    if (best.t >= whnf.w) {
+        return;
     }
+
+    float4 colorNear = float4(1.f, 1.f, 1.f, 1.f);
+    float4 colorFar = float4(0.f, 0.f, 0.f, 1.f);
+
+    texOutput[DTid.xy] = lerp(colorNear, colorFar, 1.f - 1 / best.t);
 }

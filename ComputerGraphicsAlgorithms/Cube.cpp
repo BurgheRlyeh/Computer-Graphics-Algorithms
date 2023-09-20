@@ -476,49 +476,45 @@ void Cube::render(ID3D11SamplerState* pSampler, ID3D11Buffer* pSceneBuffer, ID3D
 }
 
 void Cube::rayTracingInit(ID3D11Texture2D* texture) {
-	HRESULT hr{ S_OK };
-
 	// create shader
-	hr = compileAndCreateShader(
+	HRESULT hr{ compileAndCreateShader(
 		m_pDevice,
 		L"RayCasting.cs",
 		(ID3D11DeviceChild**)&m_pRTShader
-	);
+	) };
 	ThrowIfFailed(hr);
 
 	// create
 	rayTracingUpdate(texture);
 }
 	
-void Cube::rayTracingUpdate(ID3D11Texture2D* texture) {
-	HRESULT hr{ S_OK };
-
+void Cube::rayTracingUpdate(ID3D11Texture2D* tex) {
 	D3D11_UNORDERED_ACCESS_VIEW_DESC desc{
 		.Format{ DXGI_FORMAT_UNKNOWN },
 		.ViewDimension{ D3D11_UAV_DIMENSION_TEXTURE2D },
 		.Texture2D{}
 	};
 
-	hr = m_pDevice->CreateUnorderedAccessView(texture, &desc, &m_pRTTexture);
+	HRESULT hr{ 
+		m_pDevice->CreateUnorderedAccessView(tex, &desc, &m_pRTTexture)
+	};
 	ThrowIfFailed(hr);
 
 	hr = SetResourceName(m_pRTTexture, "RayCastingTextureUAV");
 	ThrowIfFailed(hr);
 }
 
-void Cube::rayTracing(ID3D11Buffer* m_pSceneBuffer, ID3D11Buffer* m_pRTBuffer, int width, int height) {
+void Cube::rayTracing(ID3D11Buffer* m_pSBuf, ID3D11Buffer* m_pRTBuf, int w, int h) {
 	ID3D11Buffer* constBuffers[4]{
-		m_pSceneBuffer, m_pModelBufferInst, m_pVIBuffer, m_pRTBuffer
+		m_pSBuf, m_pModelBufferInst, m_pVIBuffer, m_pRTBuf
 	};
 	m_pDeviceContext->CSSetConstantBuffers(0, 4, constBuffers);
 
-	ID3D11UnorderedAccessView* uavBuffers[]{
-		m_pRTTexture
-	};
+	ID3D11UnorderedAccessView* uavBuffers[]{ m_pRTTexture };
 	m_pDeviceContext->CSSetUnorderedAccessViews(0, 1, uavBuffers, nullptr);
 
 	m_pDeviceContext->CSSetShader(m_pRTShader, nullptr, 0);
-	m_pDeviceContext->Dispatch(width, height, 1);
+	m_pDeviceContext->Dispatch(w, h, 1);
 }
 
 HRESULT Cube::initCull() {

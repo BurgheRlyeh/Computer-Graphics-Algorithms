@@ -381,10 +381,7 @@ bool Renderer::update() {
 	};
 	Matrix vp = v * p;
 	Matrix pv = p * v;
-	//m_rtBuffer.pvInv = p.Invert() * v.Invert();
-	//m_rtBuffer.pvInv = v.Invert() * p.Invert();
 	m_rtBuffer.pvInv = vp.Invert();
-	//m_rtBuffer.pvInv = pv.Invert();
 
 	memcpy(subres.pData, &m_rtBuffer, sizeof(RTBuffer));
 	m_pDeviceContext->Unmap(m_pRTBuffer, 0);
