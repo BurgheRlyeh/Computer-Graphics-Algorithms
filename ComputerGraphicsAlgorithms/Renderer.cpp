@@ -110,8 +110,8 @@ bool Renderer::init(HWND hWnd) {
 
 	m_camera = Camera{
 		.r{ 5.f },
-		.angX{  -XM_PI },
-		//.angY{ XM_PI / 4 },
+		.angX{ - 3.5f * XM_PI / 4 },
+		.angY{  XM_PI / 6 },
 	};
 
 	SAFE_RELEASE(adapter);
@@ -194,7 +194,7 @@ HRESULT Renderer::createDeviceAndSwapChain(HWND hWnd, IDXGIAdapter* adapter) {
 	assert(hWnd);
 	assert(adapter);
 
-	D3D_FEATURE_LEVEL level, levels[]{ D3D_FEATURE_LEVEL_11_0 };
+	D3D_FEATURE_LEVEL level, levels[]{ D3D_FEATURE_LEVEL_12_0 };
 
 	UINT flags{};
 #ifdef _DEBUG
@@ -239,7 +239,7 @@ HRESULT Renderer::createDeviceAndSwapChain(HWND hWnd, IDXGIAdapter* adapter) {
 		&m_pDeviceContext
 	) };
 
-	assert(level == D3D_FEATURE_LEVEL_11_0);
+	//assert(level == D3D_FEATURE_LEVEL_11_1);
 
 	return hr;
 }
@@ -480,7 +480,8 @@ bool Renderer::render() {
 
 		Vector3 n = unprojectedNear;
 		Vector3 f = unprojectedFar;
-		Vector3 d = result;
+		Vector3 d = f - n;
+		Vector3 nd = result;
 		
 		Vector3 camPos = m_camera.getPosition();
 		float x = camPos.x - d.x * (camPos.y / d.y);
@@ -489,7 +490,9 @@ bool Renderer::render() {
 		ImGui::Text("Near: (%f, %f, %f)", n.x, n.y, n.z);
 		ImGui::Text("Far : (%f, %f, %f)", f.x, f.y, f.z);
 		ImGui::Text("Dir : (%f, %f, %f)", d.x, d.y, d.z);
+		ImGui::Text("nDir: (%f, %f, %f)", nd.x, nd.y, nd.z);
 		ImGui::Text("Res : (%f, %f, %f)", x, camPos.y, z);
+		ImGui::Text("Cam : (%f, %f, %f)", camPos.x, camPos.y, camPos.z);
 		
 		ImGui::End();
 	}

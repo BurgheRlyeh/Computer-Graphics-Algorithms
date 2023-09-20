@@ -120,7 +120,7 @@ class Renderer {
 	UINT m_width{ 16 };
 	UINT m_height{ 16 };
 
-	bool m_isModelRotate{  };
+	bool m_isModelRotate{ true };
 
 	size_t m_prevTime{};
 
