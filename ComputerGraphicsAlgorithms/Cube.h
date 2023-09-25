@@ -15,7 +15,7 @@ struct AABB;
 
 class Cube {
 public:
-	static const int MaxInstances{ 100 };
+	static const int MaxInstances{ 50 };
 
 private:
 	typedef struct TextureTangentVertex {
@@ -128,11 +128,17 @@ private:
 	ID3D11UnorderedAccessView* m_pIndirectArgsUAV{};
 
 	// rt
+	struct ModelBufferInv {
+		DirectX::SimpleMath::Matrix modelMatrixInv{};
+	};
+	std::vector<ModelBufferInv> m_modelBuffersInv{ MaxInstances };
+	ID3D11Buffer* m_pModelBufferInv{};
+
 	ID3D11UnorderedAccessView* m_pRTTexture{};
 	VIBuffer m_viBuffer{};
 	ID3D11Buffer* m_pVIBuffer{};
 	ID3D11ComputeShader* m_pRTShader{};
-	bool m_isRayTracing{};
+	bool m_isRayTracing{ true };
 
 	ID3D11Query* m_queries[10]{};
 	UINT64 m_curFrame{};
@@ -155,12 +161,14 @@ public:
 
 	float getModelRotationSpeed();
 	bool getIsDoCull();
+	bool getIsRayTracing();
+	int getInstCount();
 
 	HRESULT init(DirectX::SimpleMath::Matrix* positions, int num);
 	void term();
 
 	void update(float delta, bool isRotate);
-	void render(ID3D11SamplerState* sampler, ID3D11Buffer* SceneBuffer, ID3D11Buffer* pRTBuffer, int w, int h);
+	void render(ID3D11SamplerState* sampler, ID3D11Buffer* SceneBuffer);
 
 	HRESULT initCull();
 	void calcFrustum(Camera& camera, float aspectRatio, DirectX::SimpleMath::Plane frustum[6]);
@@ -172,7 +180,7 @@ public:
 
 	void rayTracingInit(ID3D11Texture2D* texture);
 	void rayTracingUpdate(ID3D11Texture2D* texture);
-	void rayTracing(ID3D11Buffer* m_pSceneBuffer, ID3D11Buffer* m_pRTBuffer, int width, int height);
+	void rayTracing(ID3D11SamplerState* pSampler, ID3D11Buffer* m_pSceneBuffer, ID3D11Buffer* m_pRTBuffer, int width, int height);
 
 private:
 	HRESULT createVertexBuffer(Vertex(&vertices)[], UINT numVertices);

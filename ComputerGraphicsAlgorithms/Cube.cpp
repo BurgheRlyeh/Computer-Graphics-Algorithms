@@ -27,6 +27,14 @@ bool Cube::getIsDoCull() {
 	return m_doCull;
 }
 
+bool Cube::getIsRayTracing() {
+	return m_isRayTracing;
+}
+
+int Cube::getInstCount() {
+	return m_instCount;
+}
+
 HRESULT Cube::init(Matrix* positions, int num) {
 	HRESULT hr{ S_OK };
 
@@ -116,7 +124,7 @@ HRESULT Cube::init(Matrix* positions, int num) {
 		);
 		THROW_IF_FAILED(hr);
 	}
-
+	
 	// create input layout
 	{
 		hr = m_pDevice->CreateInputLayout(
@@ -156,6 +164,21 @@ HRESULT Cube::init(Matrix* positions, int num) {
 		THROW_IF_FAILED(hr);
 	}
 
+	// create model -1 buffer
+	{
+		D3D11_BUFFER_DESC desc{
+			.ByteWidth{ sizeof(ModelBufferInv) * MaxInstances },
+			.Usage{ D3D11_USAGE_DEFAULT },
+			.BindFlags{ D3D11_BIND_CONSTANT_BUFFER }
+		};
+
+		hr = m_pDevice->CreateBuffer(&desc, nullptr, &m_pModelBufferInv);
+		THROW_IF_FAILED(hr);
+
+		hr = SetResourceName(m_pModelBufferInv, "ModelBufferInv");
+		THROW_IF_FAILED(hr);
+	}
+
 	// init models
 	{
 		Vector3 pos{ 0.0f, 0.0f, 0.0f };
@@ -164,7 +187,9 @@ HRESULT Cube::init(Matrix* positions, int num) {
 		m_modelBuffers[0].settings = {
 			0.0f, m_modelRotationSpeed, 0.0f, *reinterpret_cast<float*>(&useNM)
 		};
-		m_modelBuffers[0].posAndAng = { 1e-5f, 0.0f, 0.0f, 0.0f };
+		m_modelBuffers[0].posAndAng = { 0.f, 0.0f, 0.0f, 0.0f };
+		m_modelBuffers[0].updateMatrices();
+		m_modelBuffersInv[0].modelMatrixInv = m_modelBuffers[0].matrix.Invert();
 
 		Vector3 diag{ sqrtf(2.0f), 1.f, sqrtf(2.0f) };
 		m_modelBBs[0].vmin = pos - diag / 2;
@@ -178,6 +203,8 @@ HRESULT Cube::init(Matrix* positions, int num) {
 		};
 		m_modelBuffers[1].posAndAng = { pos.x, pos.y, pos.z, 0.0f };
 		m_modelBuffers[1].updateMatrices();
+		m_modelBuffersInv[1].modelMatrixInv = m_modelBuffers[1].matrix.Invert();
+
 		m_modelBBs[1].vmin = pos - Vector3{ 0.5f, 0.5f, 0.5f };
 		m_modelBBs[1].vmax = pos + Vector3{ 0.5f, 0.5f, 0.5f };
 
@@ -187,7 +214,7 @@ HRESULT Cube::init(Matrix* positions, int num) {
 	// create model visibility buffer
 	{
 		D3D11_BUFFER_DESC desc{
-			.ByteWidth{ sizeof(XMINT4)* MaxInstances },
+			.ByteWidth{ sizeof(XMINT4) * MaxInstances },
 			.Usage{ D3D11_USAGE_DYNAMIC },
 			.BindFlags{ D3D11_BIND_CONSTANT_BUFFER },
 			.CPUAccessFlags{ D3D11_CPU_ACCESS_WRITE }
@@ -421,15 +448,22 @@ void Cube::update(float delta, bool isRotate) {
 		return;
 	}
 
-	for (auto& model : m_modelBuffers) {
-		model.posAndAng.w += delta * model.settings.y;
-		model.updateMatrices();
+	for (int i{}; i < m_instCount; ++i) {
+		m_modelBuffers[i].posAndAng.w += delta * m_modelBuffers[i].settings.y;
+		m_modelBuffers[i].updateMatrices();
+		m_modelBuffers[i].matrix.Invert(m_modelBuffersInv[i].modelMatrixInv);
 	}
 
+	/*for (auto& model : m_modelBuffers) {
+		model.posAndAng.w += delta * model.settings.y;
+		model.updateMatrices();
+	}*/
+
 	m_pDeviceContext->UpdateSubresource(m_pModelBufferInst, 0, nullptr, m_modelBuffers.data(), 0, 0);
+	m_pDeviceContext->UpdateSubresource(m_pModelBufferInv, 0, nullptr, m_modelBuffersInv.data(), 0, 0);
 }
 
-void Cube::render(ID3D11SamplerState* pSampler, ID3D11Buffer* pSceneBuffer, ID3D11Buffer* pRTBuffer, int w, int h) {
+void Cube::render(ID3D11SamplerState* pSampler, ID3D11Buffer* pSceneBuffer) {
 	ID3D11SamplerState* samplers[]{ pSampler };
 	m_pDeviceContext->PSSetSamplers(0, 1, samplers);
 
@@ -464,15 +498,6 @@ void Cube::render(ID3D11SamplerState* pSampler, ID3D11Buffer* pSceneBuffer, ID3D
 	} else {
 		m_pDeviceContext->DrawIndexedInstanced(36, m_instCount, 0, 0, 0);
 	}
-
-	if (m_isRayTracing) {
-		rayTracing(pSceneBuffer, pRTBuffer, w, h);
-	}
-	/*ID3D11UnorderedAccessView* nullUav{};
-	m_pDeviceContext->CSSetUnorderedAccessViews(0, 1, &nullUav, nullptr);*/
-
-	/*ID3D11RenderTargetView* nullRtv{};
-	m_pDeviceContext->OMSetRenderTargets(1, &nullRtv, nullptr);*/
 }
 
 void Cube::rayTracingInit(ID3D11Texture2D* texture) {
@@ -499,22 +524,38 @@ void Cube::rayTracingUpdate(ID3D11Texture2D* tex) {
 		m_pDevice->CreateUnorderedAccessView(tex, &desc, &m_pRTTexture)
 	};
 	THROW_IF_FAILED(hr);
-
+	 
 	hr = SetResourceName(m_pRTTexture, "RayCastingTextureUAV");
 	THROW_IF_FAILED(hr);
 }
 
-void Cube::rayTracing(ID3D11Buffer* m_pSBuf, ID3D11Buffer* m_pRTBuf, int w, int h) {
-	ID3D11Buffer* constBuffers[4]{
-		m_pSBuf, m_pModelBufferInst, m_pVIBuffer, m_pRTBuf
+void Cube::rayTracing(ID3D11SamplerState* pSampler, ID3D11Buffer* m_pSBuf, ID3D11Buffer* m_pRTBuf, int w, int h) {
+	ID3D11SamplerState* samplers[]{ pSampler };
+	m_pDeviceContext->CSSetSamplers(0, 1, samplers);
+
+	ID3D11ShaderResourceView* resources[]{ m_pTextureView, m_pTextureViewNM };
+	m_pDeviceContext->CSSetShaderResources(0, 2, resources);
+
+	ID3D11Buffer* constBuffers[5]{
+		m_pModelBufferInst, m_pVIBuffer, m_pRTBuf, m_pModelBufferInv
 	};
 	m_pDeviceContext->CSSetConstantBuffers(0, 4, constBuffers);
+
+	// unbind rtv
+	ID3D11RenderTargetView* nullRtv{};
+	m_pDeviceContext->OMSetRenderTargets(1, &nullRtv, nullptr);
+
+
 
 	ID3D11UnorderedAccessView* uavBuffers[]{ m_pRTTexture };
 	m_pDeviceContext->CSSetUnorderedAccessViews(0, 1, uavBuffers, nullptr);
 
 	m_pDeviceContext->CSSetShader(m_pRTShader, nullptr, 0);
 	m_pDeviceContext->Dispatch(w, h, 1);
+
+	// unbind uav
+	ID3D11UnorderedAccessView* nullUav{};
+	m_pDeviceContext->CSSetUnorderedAccessViews(0, 1, &nullUav, nullptr);
 }
 
 HRESULT Cube::initCull() {
@@ -814,6 +855,7 @@ void Cube::initImGUI() {
 		if (!pos.x && !pos.y && !pos.z) {
 			initModel(m_modelBuffers[m_instCount], m_modelBBs[m_instCount]);
 		}
+		//m_modelBuffers[m_instCount].matrix.Invert(m_modelBuffersInv[m_instCount].modelMatrixInv);
 		++m_instCount;
 	}
 	if (remove && m_instCount) {

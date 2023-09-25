@@ -225,7 +225,7 @@ HRESULT Renderer::createDeviceAndSwapChain(HWND hWnd, IDXGIAdapter* adapter) {
 	};
 
 	HRESULT hr{ D3D11CreateDeviceAndSwapChain(
-		adapter,					// GPU
+		adapter,
 		D3D_DRIVER_TYPE_UNKNOWN,	// тип драйвера - Software реализация, например, для тестирования, не сломан ли драйвер GPU
 		nullptr,					// дескриптор dll software реализации растеризатора
 		flags,						// различные флаги
@@ -369,7 +369,6 @@ bool Renderer::update() {
 	m_pCube->updateCullParams();
 
 	// rt update
-
 	hr = m_pDeviceContext->Map(
 		m_pRTBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &subres
 	);
@@ -381,9 +380,14 @@ bool Renderer::update() {
 		static_cast<float>(nearPlane),
 		static_cast<float>(farPlane),
 	};
+	/*Matrix vInv = v.Invert();
+	Matrix pInv = p.Invert();
+	m_rtBuffer.pvInv = vInv * pInv;*/
+
 	Matrix vp = v * p;
-	Matrix pv = p * v;
 	m_rtBuffer.pvInv = vp.Invert();
+
+	m_rtBuffer.instances.x = m_pCube->getInstCount();
 
 	memcpy(subres.pData, &m_rtBuffer, sizeof(RTBuffer));
 	m_pDeviceContext->Unmap(m_pRTBuffer, 0);
@@ -425,22 +429,28 @@ bool Renderer::render() {
 		m_pSphere->render(m_pSampler, m_pSceneBuffer);
 	}
 
-	m_pCube->cullBoxes(m_pSceneBuffer, m_camera, static_cast<float>(m_height) / m_width);
-	m_pCube->render(m_pSampler, m_pSceneBuffer, m_pRTBuffer, m_width, m_height);
+	if (m_pCube->getIsRayTracing()) {
+		m_pCube->rayTracing(m_pSampler, m_pSceneBuffer, m_pRTBuffer, m_width, m_height);
 
-	m_pDeviceContext->OMSetRenderTargets(1, views, m_isUseZBuffer ? m_pDepthBufferDSV : nullptr);
-	
+		// bind render target
+		m_pDeviceContext->OMSetRenderTargets(1, views, m_isUseZBuffer ? m_pDepthBufferDSV : nullptr);
+	}
+	else {
+		m_pCube->cullBoxes(m_pSceneBuffer, m_camera, static_cast<float>(m_height) / m_width);
+		m_pCube->render(m_pSampler, m_pSceneBuffer);
+	}
+
 	if (m_isShowLights) {
 		m_pLightSphere->render(m_pSceneBuffer, m_pDepthState, m_pOpaqueBlendState, m_sceneBuffer.lightsBumpNormsCull.x);
 	}
 
-	m_pRect->render(
+	/*m_pRect->render(
 		m_pSampler,
 		m_pSceneBuffer,
 		m_pTransDepthState,
 		m_pTransBlendState,
 		m_camera.getPosition()
-	);
+	);*/
 
 	m_pPostProcess->render(m_pBackBufferRTV, m_pSampler);
 
@@ -455,6 +465,15 @@ bool Renderer::render() {
 	ImGui_ImplDX11_NewFrame();
 	ImGui_ImplWin32_NewFrame();
 	ImGui::NewFrame();
+
+	{
+		ImGui::Begin("Info");
+
+		ImGui::Text("Width: %d", m_width);
+		ImGui::Text("Height: %d", m_height);
+
+		ImGui::End();
+	}
 
 	{
 		ImGui::Begin("RT CPU");

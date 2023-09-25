@@ -14,11 +14,11 @@ struct ModelBuffer {
 };
 
 cbuffer ModelBufferInst : register (b1) {
-    ModelBuffer modelBuffer[100];
+    ModelBuffer modelBuffer[50];
 };
 
 cbuffer ModelBufferInstVis : register (b2) {
-    uint4 ids[100];
+    uint4 ids[50];
 };
 
 Texture2DArray colorTexture : register (t0);

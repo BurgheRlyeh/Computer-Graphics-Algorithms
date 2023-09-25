@@ -43,6 +43,7 @@ class Renderer {
 	struct RTBuffer {
 		DirectX::SimpleMath::Vector4 whnf{};
 		DirectX::SimpleMath::Matrix pvInv{};
+		DirectX::SimpleMath::Vector4 instances{ 2 };
 	};
 	RTBuffer m_rtBuffer{};
 	ID3D11Buffer* m_pRTBuffer{};
