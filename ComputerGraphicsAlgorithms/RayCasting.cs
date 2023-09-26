@@ -42,9 +42,9 @@ cbuffer ModelBufferInv: register(b3) {
 
 struct Ray
 {
-    float3 orig;
-    float3 dest;
-    float3 dir;
+    float4 orig;
+    float4 dest;
+    float4 dir;
 };
 
 struct Intsec
@@ -65,27 +65,26 @@ Texture2D normalMapTexture : register(t1);
 SamplerState colorSampler : register(s0);
 
 // Projects a 3D vector from screen space into world space
-float4 screenToWorld(float4 v)
+float4 screenToWorld(float2 pixel, float depth)
 {
-    v = float4(2.f * v.xy / whnf.xy - 1, (1.f - v.z) / (whnf.z - whnf.w), 1.f);
+    float4 v = float4(2.f * pixel / whnf.xy - 1.f, (1.f - depth) / (whnf.z - whnf.w), 1.f);
     v.y *= -1;
     v = mul(vpInv, v);
     return v / v.w;
 }
 
 Ray rayGen(uint3 DTid: SV_DispatchThreadID) {
-    float4 pixelNear = float4(DTid.xy + 0.5f, 0.f, 0.f);
-    float4 pixelFar = float4(DTid.xy + 0.5f, 1.f, 0.f);
-
     Ray ray;
-    ray.orig = screenToWorld(pixelNear).xyz;
-    ray.dest = screenToWorld(pixelFar).xyz;
+
+    ray.orig = screenToWorld(DTid.xy + 0.5f, 0.f);
+    ray.dest = screenToWorld(DTid.xy + 0.5f, 1.f);
     ray.dir = normalize(ray.dest - ray.orig);
+
     return ray;
 }
 
 // Moller-Trumbore Intersection Algorithm
-Intsec rayIntsecTriangle(Ray ray, float3 v0, float3 v1, float3 v2)
+Intsec rayIntsecTriangle(Ray ray, float4 v0, float4 v1, float4 v2)
 {
     Intsec intsec;
     intsec.t = whnf.w;
@@ -119,14 +118,7 @@ Intsec rayIntsecTriangle(Ray ray, float3 v0, float3 v1, float3 v2)
     return intsec;
 }
 
-float3 getVertexWorldPos(int id, int mID)
-{
-    float4 v = float4(vertices[id].position.xyz, 1.f);
-    float4 mv = mul(modelBuffer[mID].mModel, v);
-    return mv.xyz / mv.w;
-}
-
-Intsec CalculateIntersection(Ray ray, uint3 DTid: SV_DispatchThreadID)
+Intsec CalculateIntersection(Ray ray)
 {
     Intsec best;
     best.t = whnf.w;
@@ -134,15 +126,15 @@ Intsec CalculateIntersection(Ray ray, uint3 DTid: SV_DispatchThreadID)
     for (int m = 0; m < instances.x; ++m)
     {
         Ray mray;
-        mray.orig = mul(modelBufferInv[m].mInv, float4(ray.orig, 1.f));
-        mray.dest = mul(modelBufferInv[m].mInv, float4(ray.dest, 1.f));
+        mray.orig = mul(modelBufferInv[m].mInv, ray.orig);
+        mray.dest = mul(modelBufferInv[m].mInv, ray.dest);
         mray.dir = normalize(mray.dest - mray.orig);
 
         for (int i = 0; i < 12; ++i)
         {
-            float3 v0 = vertices[indices[i].x].position.xyz;
-            float3 v1 = vertices[indices[i].y].position.xyz;
-            float3 v2 = vertices[indices[i].z].position.xyz;
+            float4 v0 = vertices[indices[i].x].position;
+            float4 v1 = vertices[indices[i].y].position;
+            float4 v2 = vertices[indices[i].z].position;
 
             Intsec curr = rayIntsecTriangle(mray, v0, v1, v2);
 
@@ -162,7 +154,7 @@ Intsec CalculateIntersection(Ray ray, uint3 DTid: SV_DispatchThreadID)
 [numthreads(1, 1, 1)]
 void cs(uint3 DTid: SV_DispatchThreadID) {
     Ray ray = rayGen(DTid);
-    Intsec best = CalculateIntersection(ray, DTid);
+    Intsec best = CalculateIntersection(ray);
 
     if (best.t >= whnf.w)
     {
@@ -176,19 +168,19 @@ void cs(uint3 DTid: SV_DispatchThreadID) {
     float4 colorFar = float4(0.f, 0.f, 0.f, 1.f);
 
     float4 finalCl = lerp(colorNear, colorFar, 1.f - 1.f / depth);
-    texOutput[DTid.xy] = finalCl;
+    //texOutput[DTid.xy] = finalCl;
 
-    //float2 uv = float2(best.u, best.v);
+    float2 uv = float2(best.u, best.v);
     //if (best.triangleID % 2 == 0)
     //{
     //    uv = 1 - uv;
     //}
 
-    //float4 color = colorTexture.SampleLevel(
-    //    colorSampler,
-    //    float3(uv, modelBuffer[best.modelID].settings.z),
-    //    0
-    //);
+    float4 color = colorTexture.SampleLevel(
+        colorSampler,
+        float3(uv, modelBuffer[best.modelID].settings.z),
+        0
+    );
 
-    //texOutput[DTid.xy] = finalCl * color;
+    texOutput[DTid.xy] = finalCl * color;
 }
