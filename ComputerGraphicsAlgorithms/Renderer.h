@@ -44,6 +44,7 @@ class Renderer {
 		DirectX::SimpleMath::Vector4 whnf{};
 		DirectX::SimpleMath::Matrix pvInv{};
 		DirectX::SimpleMath::Vector4 instances{ 2 };
+		DirectX::SimpleMath::Vector4 camDir{};
 	};
 	RTBuffer m_rtBuffer{};
 	ID3D11Buffer* m_pRTBuffer{};

@@ -368,29 +368,30 @@ bool Renderer::update() {
 	// update culling parameters
 	m_pCube->updateCullParams();
 
-	// rt update
-	hr = m_pDeviceContext->Map(
-		m_pRTBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &subres
-	);
-	THROW_IF_FAILED(hr);
+	// ray tracing buffer update
+	{
+		hr = m_pDeviceContext->Map(m_pRTBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &subres);
+		THROW_IF_FAILED(hr);
 
-	m_rtBuffer.whnf = { 
-		static_cast<float>(m_width),
-		static_cast<float>(m_height),
-		static_cast<float>(nearPlane),
-		static_cast<float>(farPlane),
-	};
-	/*Matrix vInv = v.Invert();
-	Matrix pInv = p.Invert();
-	m_rtBuffer.pvInv = vInv * pInv;*/
+		m_rtBuffer.whnf = {
+			static_cast<float>(m_width), static_cast<float>(m_height),
+			static_cast<float>(nearPlane), static_cast<float>(farPlane),
+		};
+		(v * p).Invert(m_rtBuffer.pvInv);
+		m_rtBuffer.instances.x = m_pCube->getInstCount();
 
-	Matrix vp = v * p;
-	m_rtBuffer.pvInv = vp.Invert();
+		// update direction vector
+		Vector4 n = { 1.f / m_width, -1.f / m_height, 1.f / (nearPlane - farPlane), 1.f };
+		n = Vector4::Transform(n, m_rtBuffer.pvInv);
 
-	m_rtBuffer.instances.x = m_pCube->getInstCount();
+		Vector4 f = { 1.f / m_width, -1.f / m_height, 0.f, 1.f };
+		f = Vector4::Transform(f, m_rtBuffer.pvInv);
 
-	memcpy(subres.pData, &m_rtBuffer, sizeof(RTBuffer));
-	m_pDeviceContext->Unmap(m_pRTBuffer, 0);
+		(f / f.w - n / n.w).Normalize(m_rtBuffer.camDir);
+
+		memcpy(subres.pData, &m_rtBuffer, sizeof(RTBuffer));
+		m_pDeviceContext->Unmap(m_pRTBuffer, 0);
+	}
 
 	return SUCCEEDED(hr);
 }

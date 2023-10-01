@@ -29,10 +29,10 @@ cbuffer RTBuffer: register(b2) {
     float4 whnf;
     float4x4 vpInv;
     float4 instances;
+    float4 camDir;
 }
 
-struct ModelBufferInv
-{
+struct ModelBufferInv {
     float4x4 mInv;
 };
 
@@ -64,20 +64,21 @@ Texture2D normalMapTexture : register(t1);
 
 SamplerState colorSampler : register(s0);
 
-// Projects a 3D vector from screen space into world space
-float4 screenToWorld(float2 pixel, float depth)
-{
-    float4 v = float4(2.f * pixel / whnf.xy - 1.f, (1.f - depth) / (whnf.z - whnf.w), 1.f);
-    v.y *= -1;
-    v = mul(vpInv, v);
-    return v / v.w;
+float4 pixelToWorld(float2 pixel, float depth) {
+    float2 ndc = 2.f * pixel / whnf.xy - 1.f;
+    ndc.y *= -1;
+
+    depth = (1.f - depth) / (whnf.z - whnf.w);
+
+    float4 res = mul(vpInv, float4(ndc, depth, 1.f));
+    return res / res.w;
 }
 
-Ray rayGen(uint3 DTid: SV_DispatchThreadID) {
+Ray generateRay(float2 screenPoint) {
     Ray ray;
 
-    ray.orig = screenToWorld(DTid.xy + 0.5f, 0.f);
-    ray.dest = screenToWorld(DTid.xy + 0.5f, 1.f);
+    ray.orig = pixelToWorld(screenPoint.xy + 0.5f, 0.f);
+    ray.dest = pixelToWorld(screenPoint.xy + 0.5f, 1.f);
     ray.dir = normalize(ray.dest - ray.orig);
 
     return ray;
@@ -153,28 +154,26 @@ Intsec CalculateIntersection(Ray ray)
 
 [numthreads(1, 1, 1)]
 void cs(uint3 DTid: SV_DispatchThreadID) {
-    Ray ray = rayGen(DTid);
+    Ray ray = generateRay(DTid.xy);
     Intsec best = CalculateIntersection(ray);
 
     if (best.t >= whnf.w)
-    {
         return;
-    }
 
-    Ray dir = rayGen(float3(whnf.xy / 2.f, 1.f));
-    float depth = best.t;// * dot(ray.direction, dir.direction);
+    float depth = best.t * dot(ray.dir, camDir.xyz);
 
     float4 colorNear = float4(1.f, 1.f, 1.f, 1.f);
     float4 colorFar = float4(0.f, 0.f, 0.f, 1.f);
 
     float4 finalCl = lerp(colorNear, colorFar, 1.f - 1.f / depth);
-    //texOutput[DTid.xy] = finalCl;
 
-    float2 uv = float2(best.u, best.v);
-    //if (best.triangleID % 2 == 0)
-    //{
-    //    uv = 1 - uv;
-    //}
+    Vertex v0 = vertices[indices[best.triangleID].x];
+    Vertex v1 = vertices[indices[best.triangleID].y];
+    Vertex v2 = vertices[indices[best.triangleID].z];
+
+    float u = best.u;
+    float v = best.v;
+    float2 uv = (1 - u - v) * v0.uv + u * v1.uv + v * v2.uv;
 
     float4 color = colorTexture.SampleLevel(
         colorSampler,
@@ -182,5 +181,5 @@ void cs(uint3 DTid: SV_DispatchThreadID) {
         0
     );
 
-    texOutput[DTid.xy] = finalCl * color;
+    texOutput[DTid.xy] = color;
 }
