@@ -138,6 +138,12 @@ class Renderer {
 	DirectX::SimpleMath::Matrix m_v{};
 	DirectX::SimpleMath::Matrix m_p{};
 
+	ID3D11Query* m_queries_timestamp_begin[10]{};
+	ID3D11Query* m_queries_timestamp_end[10]{};
+	ID3D11Query* m_queries_disjoint[10]{};
+	UINT64 m_curFrame{};
+	UINT64 m_lastCompletedFrame{};	
+
 public:
 	MouseHandler m_mouseHandler;
 	KeyboardHandler m_keyboardHandler;

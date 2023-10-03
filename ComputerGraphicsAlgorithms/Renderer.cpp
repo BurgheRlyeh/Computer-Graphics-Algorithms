@@ -136,6 +136,22 @@ bool Renderer::init(HWND hWnd) {
 		m_sceneBuffer.ambientColor = { 0.15f, 0.15f, 0.15f, 1.0f };
 	}
 
+	{
+		D3D11_QUERY_DESC descT{ D3D11_QUERY_TIMESTAMP };
+		D3D11_QUERY_DESC descTD{ D3D11_QUERY_TIMESTAMP_DISJOINT };
+		for (int i{}; i < 10 && SUCCEEDED(hr); ++i) {
+			hr = m_pDevice->CreateQuery(&descT, &m_queries_timestamp_begin[i]);
+			hr = m_pDevice->CreateQuery(&descT, &m_queries_timestamp_end[i]);
+			hr = m_pDevice->CreateQuery(&descTD, &m_queries_disjoint[i]);
+		}
+		THROW_IF_FAILED(hr);
+
+		// Start a disjoint query first
+		m_pDeviceContext->Begin(m_queries_disjoint[m_curFrame]);
+		// Insert the start timestamp
+		m_pDeviceContext->End(m_queries_disjoint[m_curFrame]);
+	}
+
 	if (FAILED(hr)) {
 		term();
 	}
@@ -149,6 +165,12 @@ void Renderer::term() {
 	ImGui::DestroyContext();
 
 	termScene();
+
+	for (int i = 0; i < 10; i++) {
+		SAFE_RELEASE(m_queries_timestamp_begin[i]);
+		SAFE_RELEASE(m_queries_timestamp_end[i]);
+		SAFE_RELEASE(m_queries_disjoint[i]);
+	}
 
 	SAFE_RELEASE(m_pBackBufferRTV);
 	SAFE_RELEASE(m_pSwapChain);
@@ -430,10 +452,13 @@ bool Renderer::render() {
 		m_pSphere->render(m_pSampler, m_pSceneBuffer);
 	}
 
+	// CUBE
+
+	m_pDeviceContext->Begin(m_queries_disjoint[m_curFrame % 10]);
+	m_pDeviceContext->End(m_queries_timestamp_begin[m_curFrame % 10]);
+
 	if (m_pCube->getIsRayTracing()) {
-
 		m_pCube->rayTracing(m_pSampler, m_pSceneBuffer, m_pRTBuffer, m_width, m_height);
-
 		// bind render target
 		m_pDeviceContext->OMSetRenderTargets(1, views, m_isUseZBuffer ? m_pDepthBufferDSV : nullptr);
 	}
@@ -441,6 +466,38 @@ bool Renderer::render() {
 		m_pCube->cullBoxes(m_pSceneBuffer, m_camera, static_cast<float>(m_height) / m_width);
 		m_pCube->render(m_pSampler, m_pSceneBuffer);
 	}
+
+	m_pDeviceContext->End(m_queries_timestamp_end[m_curFrame % 10]);
+	m_pDeviceContext->End(m_queries_disjoint[m_curFrame % 10]);
+	++m_curFrame;
+
+	UINT64 begin{};
+	UINT64 end{};
+	D3D11_QUERY_DATA_TIMESTAMP_DISJOINT disjoint;
+
+	while (m_lastCompletedFrame < m_curFrame) {
+
+		while (m_pDeviceContext->GetData(
+			m_queries_timestamp_begin[m_lastCompletedFrame % 10],
+			&begin, sizeof(begin), 0
+		) != S_OK);
+
+		while (m_pDeviceContext->GetData(
+			m_queries_timestamp_end[m_lastCompletedFrame % 10],
+			&end, sizeof(end), 0
+		) != S_OK);
+
+		while (m_pDeviceContext->GetData(
+			m_queries_disjoint[m_lastCompletedFrame % 10],
+			&disjoint, sizeof(disjoint), 0
+		) != S_OK);
+
+		++m_lastCompletedFrame;
+	}
+
+
+	
+	// CUBE END
 
 	if (m_isShowLights) {
 		m_pLightSphere->render(m_pSceneBuffer, m_pDepthState, m_pOpaqueBlendState, m_sceneBuffer.lightsBumpNormsCull.x);
@@ -458,11 +515,6 @@ bool Renderer::render() {
 
 	m_pCube->readQueries();
 
-	UINT64 startTime = 0;
-	UINT64 endTime = 0;
-	UINT64 frequency = 0;
-	BOOL disjoint = FALSE;
-
 	// Start the Dear ImGui frame
 	ImGui_ImplDX11_NewFrame();
 	ImGui_ImplWin32_NewFrame();
@@ -470,6 +522,8 @@ bool Renderer::render() {
 
 	{
 		ImGui::Begin("Info");
+
+		ImGui::Text("Time: %d", (end - begin));
 
 		ImGui::Text("Width: %d", m_width);
 		ImGui::Text("Height: %d", m_height);

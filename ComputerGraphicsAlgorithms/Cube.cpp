@@ -830,10 +830,6 @@ void Cube::readQueries() {
 }
 
 void Cube::initImGUI() {
-	
-	
-
-
 	ImGui::Begin("Instances");
 
 	ImGui::Checkbox("Use ray tracing", &m_isRayTracing);
