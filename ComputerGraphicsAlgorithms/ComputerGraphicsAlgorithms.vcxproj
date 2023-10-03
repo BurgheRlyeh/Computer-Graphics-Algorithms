@@ -146,6 +146,7 @@
     <ClInclude Include="..\Common\imgui\imstb_textedit.h" />
     <ClInclude Include="..\Common\imgui\imstb_truetype.h" />
     <ClInclude Include="AABB.h" />
+    <ClInclude Include="BVH.h" />
     <ClInclude Include="Camera.h" />
     <ClInclude Include="ComputerGraphicsAlgorithms.h" />
     <ClInclude Include="Cube.h" />
@@ -216,7 +217,7 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
-    <FxCompile Include="ComputeShader.hlsl">
+    <FxCompile Include="RayCasting.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Compute</ShaderType>
       <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">5.0</ShaderModel>
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Compute</ShaderType>

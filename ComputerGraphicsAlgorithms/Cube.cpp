@@ -529,7 +529,13 @@ void Cube::rayTracingUpdate(ID3D11Texture2D* tex) {
 	THROW_IF_FAILED(hr);
 }
 
+#include "BVH.h"
+
 void Cube::rayTracing(ID3D11SamplerState* pSampler, ID3D11Buffer* m_pSBuf, ID3D11Buffer* m_pRTBuf, int w, int h) {
+	BVH* bvh = new BVH(this);
+	bvh->upd(m_instCount, m_modelBuffers.data());
+	bvh->build();
+	
 	ID3D11SamplerState* samplers[]{ pSampler };
 	m_pDeviceContext->CSSetSamplers(0, 1, samplers);
 

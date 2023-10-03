@@ -431,6 +431,7 @@ bool Renderer::render() {
 	}
 
 	if (m_pCube->getIsRayTracing()) {
+
 		m_pCube->rayTracing(m_pSampler, m_pSceneBuffer, m_pRTBuffer, m_width, m_height);
 
 		// bind render target
