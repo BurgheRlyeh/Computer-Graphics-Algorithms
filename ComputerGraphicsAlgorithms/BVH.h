@@ -8,18 +8,23 @@ class Cube;
 using namespace DirectX;
 using namespace DirectX::SimpleMath;
 
-struct Tri {
-	Vector4 v0{}, v1{}, v2{};
-	Vector4 center{};
-};
-
-struct BVHNode {
-	Vector4 aabbMin, aabbMax;
-	UINT left;
-	UINT firstTriIdx, triCnt;
-};
-
 class BVH {
+	struct Tri {
+		Vector4 v0{}, v1{}, v2{};
+		Vector4 center{};
+	};
+
+	struct BVHNode {
+		Vector4 bbMin, bbMax;
+		UINT left;
+		UINT firstIdx, cnt;
+	};
+
+	struct BVHConstBuffer {
+		Vector4 bbMin, bbMax;
+		XMUINT4 leftFirstCnt;
+	};
+
 	static const UINT N{ 600 };
 
 	Tri tri[N]{};
@@ -60,8 +65,8 @@ public:
 		}
 		BVHNode& root = bvhNode[rootNodeIdx];
 		root.left = 0;
-		root.firstTriIdx = 0;
-		root.triCnt = 12 * cnt;
+		root.firstIdx = 0;
+		root.cnt = 12 * cnt;
 		updNodeBounds(rootNodeIdx);
 		// subdivide recursively
 		Subdivide(rootNodeIdx);
@@ -70,17 +75,17 @@ public:
 private:
 	void updNodeBounds(UINT nodeIdx) {
 		BVHNode& node = bvhNode[nodeIdx];
-		node.aabbMin = { 1e30f, 1e30f, 1e30f };
-		node.aabbMax = { -1e30f, -1e30f, -1e30f };
-		UINT first{ node.firstTriIdx };
-		for (UINT i{}; i < node.triCnt; ++i) {
+		node.bbMin = { 1e30f, 1e30f, 1e30f };
+		node.bbMax = { -1e30f, -1e30f, -1e30f };
+		UINT first{ node.firstIdx };
+		for (UINT i{}; i < node.cnt; ++i) {
 			Tri& leafTri = tri[triIdx[first + i]];
-			node.aabbMin = Vector4::Min(node.aabbMin, leafTri.v0);
-			node.aabbMin = Vector4::Min(node.aabbMin, leafTri.v1);
-			node.aabbMin = Vector4::Min(node.aabbMin, leafTri.v2);
-			node.aabbMax = Vector4::Max(node.aabbMax, leafTri.v0);
-			node.aabbMax = Vector4::Max(node.aabbMax, leafTri.v1);
-			node.aabbMax = Vector4::Max(node.aabbMax, leafTri.v2);
+			node.bbMin = Vector4::Min(node.bbMin, leafTri.v0);
+			node.bbMin = Vector4::Min(node.bbMin, leafTri.v1);
+			node.bbMin = Vector4::Min(node.bbMin, leafTri.v2);
+			node.bbMax = Vector4::Max(node.bbMax, leafTri.v0);
+			node.bbMax = Vector4::Max(node.bbMax, leafTri.v1);
+			node.bbMax = Vector4::Max(node.bbMax, leafTri.v2);
 		}
 	}
 
@@ -97,11 +102,11 @@ private:
 	void Subdivide(UINT nodeIdx) {
 		// terminate recursion
 		BVHNode& node{ bvhNode[nodeIdx] };
-		if (node.triCnt <= 2)
+		if (node.cnt <= 2)
 			return;
 
 		// determine split axis and position
-		Vector4 extent{ node.aabbMax - node.aabbMin };
+		Vector4 extent{ node.bbMax - node.bbMin };
 
 		//int a{ static_cast<int>(extent.x < extent.y) };
 		//a += static_cast<int>(vecCompByIdx(extent, a) < extent.z);
@@ -112,11 +117,11 @@ private:
 		if (extent.z > vecCompByIdx(extent, axis))
 			axis = 2;
 
-		float splitPos{ vecCompByIdx(node.aabbMin, axis) + 0.5f * vecCompByIdx(extent, axis) };
+		float splitPos{ vecCompByIdx(node.bbMin, axis) + 0.5f * vecCompByIdx(extent, axis) };
 		
 		// in-place partition
-		UINT i{ node.firstTriIdx };
-		UINT j{ i + node.triCnt - 1 };
+		UINT i{ node.firstIdx };
+		UINT j{ i + node.cnt - 1 };
 		while (i <= j) {
 			//if (splitPos <= vecCompByIdx(tri[triIdx[i++]].center, axis))
 			//	std::swap(triIdx[--i], triIdx[j--]);
@@ -128,21 +133,21 @@ private:
 		}
 
 		// abort split if one of the sides is empty
-		UINT leftCnt{ i - node.firstTriIdx };
-		if (leftCnt == 0 || leftCnt == node.triCnt)
+		UINT leftCnt{ i - node.firstIdx };
+		if (leftCnt == 0 || leftCnt == node.cnt)
 			return;
 
 		// create child nodes
 		int leftIdx = nodesUsed++;
-		bvhNode[leftIdx].firstTriIdx = node.firstTriIdx;
-		bvhNode[leftIdx].triCnt = leftCnt;
+		bvhNode[leftIdx].firstIdx = node.firstIdx;
+		bvhNode[leftIdx].cnt = leftCnt;
 
 		int rightIdx = nodesUsed++;
-		bvhNode[rightIdx].firstTriIdx = i;
-		bvhNode[rightIdx].triCnt = node.triCnt - leftCnt;
+		bvhNode[rightIdx].firstIdx = i;
+		bvhNode[rightIdx].cnt = node.cnt - leftCnt;
 
 		node.left = leftIdx;
-		node.triCnt = 0;
+		node.cnt = 0;
 		updNodeBounds(leftIdx);
 		updNodeBounds(rightIdx);
 

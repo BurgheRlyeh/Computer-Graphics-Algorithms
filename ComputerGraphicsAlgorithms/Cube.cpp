@@ -1,6 +1,7 @@
 ﻿#include "Cube.h"
 
 #include "ShaderProcessor.h"
+#include "BVH.h"
 
 #include "../Common/imgui/imgui.h"
 #include "../Common/imgui/backends/imgui_impl_dx11.h"
@@ -321,6 +322,13 @@ HRESULT Cube::init(Matrix* positions, int num) {
 		free(textureDesc.pData);
 	}
 
+	// timers init
+	{
+		m_pGPUTimer = new GPUTimer(m_pDevice, m_pDeviceContext);
+		m_pGPUTimer->init();
+		m_pCPUTimer = new CPUTimer();
+	}
+
 	return hr;
 }
 
@@ -490,13 +498,19 @@ void Cube::render(ID3D11SamplerState* pSampler, ID3D11Buffer* pSceneBuffer) {
 		if (m_computeCull) {
 			m_pDeviceContext->CopyResource(m_pIndirectArgs, m_pIndirectArgsSrc);
 			m_pDeviceContext->Begin(m_queries[m_curFrame % 10]);
+			m_pGPUTimer->start();
 			m_pDeviceContext->DrawIndexedInstancedIndirect(m_pIndirectArgs, 0);
+			m_pGPUTimer->stop();
 			m_pDeviceContext->End(m_queries[m_curFrame++ % 10]);
 		} else {
+			m_pGPUTimer->start();
 			m_pDeviceContext->DrawIndexedInstanced(36, m_instVisCount, 0, 0, 0);
+			m_pGPUTimer->stop();
 		}
 	} else {
+		m_pGPUTimer->start();
 		m_pDeviceContext->DrawIndexedInstanced(36, m_instCount, 0, 0, 0);
+		m_pGPUTimer->stop();
 	}
 }
 
@@ -529,12 +543,12 @@ void Cube::rayTracingUpdate(ID3D11Texture2D* tex) {
 	THROW_IF_FAILED(hr);
 }
 
-#include "BVH.h"
-
 void Cube::rayTracing(ID3D11SamplerState* pSampler, ID3D11Buffer* m_pSBuf, ID3D11Buffer* m_pRTBuf, int w, int h) {
+	m_pCPUTimer->start();
 	BVH* bvh = new BVH(this);
 	bvh->upd(m_instCount, m_modelBuffers.data());
 	bvh->build();
+	m_pCPUTimer->stop();
 	
 	ID3D11SamplerState* samplers[]{ pSampler };
 	m_pDeviceContext->CSSetSamplers(0, 1, samplers);
@@ -542,7 +556,7 @@ void Cube::rayTracing(ID3D11SamplerState* pSampler, ID3D11Buffer* m_pSBuf, ID3D1
 	ID3D11ShaderResourceView* resources[]{ m_pTextureView, m_pTextureViewNM };
 	m_pDeviceContext->CSSetShaderResources(0, 2, resources);
 
-	ID3D11Buffer* constBuffers[5]{
+	ID3D11Buffer* constBuffers[4]{
 		m_pModelBufferInst, m_pVIBuffer, m_pRTBuf, m_pModelBufferInv
 	};
 	m_pDeviceContext->CSSetConstantBuffers(0, 4, constBuffers);
@@ -551,13 +565,13 @@ void Cube::rayTracing(ID3D11SamplerState* pSampler, ID3D11Buffer* m_pSBuf, ID3D1
 	ID3D11RenderTargetView* nullRtv{};
 	m_pDeviceContext->OMSetRenderTargets(1, &nullRtv, nullptr);
 
-
-
 	ID3D11UnorderedAccessView* uavBuffers[]{ m_pRTTexture };
 	m_pDeviceContext->CSSetUnorderedAccessViews(0, 1, uavBuffers, nullptr);
 
 	m_pDeviceContext->CSSetShader(m_pRTShader, nullptr, 0);
+	m_pGPUTimer->start();
 	m_pDeviceContext->Dispatch(w, h, 1);
+	m_pGPUTimer->stop();
 
 	// unbind uav
 	ID3D11UnorderedAccessView* nullUav{};
@@ -814,6 +828,7 @@ void Cube::cullBoxes(ID3D11Buffer* m_pSceneBuffer, Camera& camera, float aspectR
 
 void Cube::readQueries() {
 	D3D11_QUERY_DATA_PIPELINE_STATISTICS stats;
+
 	while (m_lastCompletedFrame < m_curFrame) {
 		HRESULT hr = m_pDeviceContext->GetData(
 			m_queries[m_lastCompletedFrame % 10],

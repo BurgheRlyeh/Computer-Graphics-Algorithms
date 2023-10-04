@@ -2,10 +2,6 @@
 #include "Renderer.h"
 #include "Texture.h"
 
-#include "../Common/imgui/imgui.h"
-#include "../Common/imgui/backends/imgui_impl_dx11.h"
-#include "../Common/imgui/backends/imgui_impl_win32.h"
-
 using namespace DirectX;
 using namespace DirectX::SimpleMath;
 
@@ -136,22 +132,6 @@ bool Renderer::init(HWND hWnd) {
 		m_sceneBuffer.ambientColor = { 0.15f, 0.15f, 0.15f, 1.0f };
 	}
 
-	{
-		D3D11_QUERY_DESC descT{ D3D11_QUERY_TIMESTAMP };
-		D3D11_QUERY_DESC descTD{ D3D11_QUERY_TIMESTAMP_DISJOINT };
-		for (int i{}; i < 10 && SUCCEEDED(hr); ++i) {
-			hr = m_pDevice->CreateQuery(&descT, &m_queries_timestamp_begin[i]);
-			hr = m_pDevice->CreateQuery(&descT, &m_queries_timestamp_end[i]);
-			hr = m_pDevice->CreateQuery(&descTD, &m_queries_disjoint[i]);
-		}
-		THROW_IF_FAILED(hr);
-
-		// Start a disjoint query first
-		m_pDeviceContext->Begin(m_queries_disjoint[m_curFrame]);
-		// Insert the start timestamp
-		m_pDeviceContext->End(m_queries_disjoint[m_curFrame]);
-	}
-
 	if (FAILED(hr)) {
 		term();
 	}
@@ -165,12 +145,6 @@ void Renderer::term() {
 	ImGui::DestroyContext();
 
 	termScene();
-
-	for (int i = 0; i < 10; i++) {
-		SAFE_RELEASE(m_queries_timestamp_begin[i]);
-		SAFE_RELEASE(m_queries_timestamp_end[i]);
-		SAFE_RELEASE(m_queries_disjoint[i]);
-	}
 
 	SAFE_RELEASE(m_pBackBufferRTV);
 	SAFE_RELEASE(m_pSwapChain);
@@ -453,10 +427,6 @@ bool Renderer::render() {
 	}
 
 	// CUBE
-
-	m_pDeviceContext->Begin(m_queries_disjoint[m_curFrame % 10]);
-	m_pDeviceContext->End(m_queries_timestamp_begin[m_curFrame % 10]);
-
 	if (m_pCube->getIsRayTracing()) {
 		m_pCube->rayTracing(m_pSampler, m_pSceneBuffer, m_pRTBuffer, m_width, m_height);
 		// bind render target
@@ -466,36 +436,6 @@ bool Renderer::render() {
 		m_pCube->cullBoxes(m_pSceneBuffer, m_camera, static_cast<float>(m_height) / m_width);
 		m_pCube->render(m_pSampler, m_pSceneBuffer);
 	}
-
-	m_pDeviceContext->End(m_queries_timestamp_end[m_curFrame % 10]);
-	m_pDeviceContext->End(m_queries_disjoint[m_curFrame % 10]);
-	++m_curFrame;
-
-	UINT64 begin{};
-	UINT64 end{};
-	D3D11_QUERY_DATA_TIMESTAMP_DISJOINT disjoint;
-
-	while (m_lastCompletedFrame < m_curFrame) {
-
-		while (m_pDeviceContext->GetData(
-			m_queries_timestamp_begin[m_lastCompletedFrame % 10],
-			&begin, sizeof(begin), 0
-		) != S_OK);
-
-		while (m_pDeviceContext->GetData(
-			m_queries_timestamp_end[m_lastCompletedFrame % 10],
-			&end, sizeof(end), 0
-		) != S_OK);
-
-		while (m_pDeviceContext->GetData(
-			m_queries_disjoint[m_lastCompletedFrame % 10],
-			&disjoint, sizeof(disjoint), 0
-		) != S_OK);
-
-		++m_lastCompletedFrame;
-	}
-
-
 	
 	// CUBE END
 
@@ -523,51 +463,12 @@ bool Renderer::render() {
 	{
 		ImGui::Begin("Info");
 
-		ImGui::Text("Time: %d", (end - begin));
+		ImGui::Text("BVH construction time (ms): %.3f", m_pCube->m_pCPUTimer->getTime());
+		ImGui::Text("Cube render time (ms): %.3f", m_pCube->m_pGPUTimer->getTime());
 
 		ImGui::Text("Width: %d", m_width);
 		ImGui::Text("Height: %d", m_height);
 
-		ImGui::End();
-	}
-
-	{
-		ImGui::Begin("RT CPU");
-
-		XMVECTOR mouseNear = DirectX::XMVectorSet(
-			(float)m_width / 2.f, (float)m_height / 2.f, 0.0f, 0.0f
-		);
-		XMVECTOR mouseFar = DirectX::XMVectorSet(
-			(float)m_width / 2.f, (float)m_height / 2.f, 1.0f, 0.0f
-		);
-		XMVECTOR unprojectedNear = DirectX::XMVector3Unproject(
-			mouseNear, 0, 0, (float)m_width, (float)m_height, 0.1f, 100.f,
-			m_p, m_v, DirectX::XMMatrixIdentity()
-		);
-		XMVECTOR unprojectedFar = DirectX::XMVector3Unproject(
-			mouseFar, 0, 0, (float)m_width, (float)m_height, 0.1f, 100.f,
-			m_p, m_v, DirectX::XMMatrixIdentity()
-		);
-		XMVECTOR result = DirectX::XMVector3Normalize(
-			DirectX::XMVectorSubtract(unprojectedFar, unprojectedNear)
-		);
-
-		Vector3 n = unprojectedNear;
-		Vector3 f = unprojectedFar;
-		Vector3 d = f - n;
-		Vector3 nd = result;
-		
-		Vector3 camPos = m_camera.getPosition();
-		float x = camPos.x - d.x * (camPos.y / d.y);
-		float z = camPos.z - d.z * (camPos.y / d.y);
-
-		ImGui::Text("Near: (%f, %f, %f)", n.x, n.y, n.z);
-		ImGui::Text("Far : (%f, %f, %f)", f.x, f.y, f.z);
-		ImGui::Text("Dir : (%f, %f, %f)", d.x, d.y, d.z);
-		ImGui::Text("nDir: (%f, %f, %f)", nd.x, nd.y, nd.z);
-		ImGui::Text("Res : (%f, %f, %f)", x, camPos.y, z);
-		ImGui::Text("Cam : (%f, %f, %f)", camPos.x, camPos.y, camPos.z);
-		
 		ImGui::End();
 	}
 

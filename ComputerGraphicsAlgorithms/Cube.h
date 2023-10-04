@@ -7,11 +7,14 @@
 #include "Texture.h"
 #include "Camera.h"
 #include "AABB.h"
+#include "Timer.h"
 
 struct TextureDesc;
 class Renderer;
 struct Camera;
 struct AABB;
+class CPUTimer;
+class GPUTimer;
 
 class Cube {
 public:
@@ -91,7 +94,7 @@ public:
 	} m_viBuffer{};
 
 	struct CullParams {
-		DirectX::XMINT4 shapeCount; // x - shapes count
+		DirectX::XMINT4 shapeCount{}; // x - shapes count
 		DirectX::SimpleMath::Vector4 bbMin[MaxInstances]{};
 		DirectX::SimpleMath::Vector4 bbMax[MaxInstances]{};
 	};
@@ -159,6 +162,9 @@ public:
 	Cube(ID3D11Device* device, ID3D11DeviceContext* deviceContext):
 		m_pDevice(device),
 		m_pDeviceContext(deviceContext) {}
+
+	GPUTimer* m_pGPUTimer{};
+	CPUTimer* m_pCPUTimer{};
 
 	float getModelRotationSpeed();
 	bool getIsDoCull();

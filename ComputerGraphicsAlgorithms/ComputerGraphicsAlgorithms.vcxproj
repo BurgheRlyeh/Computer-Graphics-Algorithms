@@ -162,6 +162,7 @@
     <ClInclude Include="Sphere.h" />
     <ClInclude Include="targetver.h" />
     <ClInclude Include="Texture.h" />
+    <ClInclude Include="Timer.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\Common\imgui\backends\imgui_impl_dx11.cpp" />
