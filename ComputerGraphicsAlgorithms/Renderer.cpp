@@ -461,7 +461,7 @@ bool Renderer::render() {
 	ImGui::NewFrame();
 
 	{
-		ImGui::Begin("Info");
+		ImGui::Begin("Stats");
 
 		ImGui::Text("BVH construction time (ms): %.3f", m_pCube->m_pCPUTimer->getTime());
 		ImGui::Text("Cube render time (ms): %.3f", m_pCube->m_pGPUTimer->getTime());

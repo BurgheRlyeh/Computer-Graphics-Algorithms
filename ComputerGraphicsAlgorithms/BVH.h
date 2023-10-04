@@ -45,12 +45,13 @@ public:
 
 		for (UINT m{}; m < instCnt; ++m) {
 			for (UINT tr{}; tr < 12; ++tr) {
-				XMINT4 trIds = cube->m_viBuffer.indices[tr];
+				UINT id{ 12 * m + tr };
+				XMINT4 trIds{ cube->m_viBuffer.indices[tr] };
+				Matrix matrix{ modelBuffers[m].matrix };
 
-				tri[12 * m + tr].v0 = Vector4::Transform(cube->m_viBuffer.vertices[trIds.x].point, modelBuffers[m].matrix);
-				tri[12 * m + tr].v1 = Vector4::Transform(cube->m_viBuffer.vertices[trIds.y].point, modelBuffers[m].matrix);
-				tri[12 * m + tr].v2 = Vector4::Transform(cube->m_viBuffer.vertices[trIds.z].point, modelBuffers[m].matrix);
-				
+				tri[id].v0 = Vector4::Transform(cube->m_viBuffer.vertices[trIds.x].point, matrix);
+				tri[id].v1 = Vector4::Transform(cube->m_viBuffer.vertices[trIds.y].point, matrix);
+				tri[id].v2 = Vector4::Transform(cube->m_viBuffer.vertices[trIds.z].point, matrix);
 			}
 		}
 	}
@@ -104,29 +105,16 @@ private:
 
 		// determine split axis and position
 		Vector4 extent{ node.bbMax - node.bbMin };
-
-		//int a{ static_cast<int>(extent.x < extent.y) };
-		//a += static_cast<int>(vecCompByIdx(extent, a) < extent.z);
-
-		int axis{};
-		if (extent.y > extent.x)
-			axis = 1;
-		if (extent.z > vecCompByIdx(extent, axis))
-			axis = 2;
-
+		int axis{ static_cast<int>(extent.x < extent.y) };
+		axis += static_cast<int>(vecCompByIdx(extent, axis) < extent.z);
 		float splitPos{ vecCompByIdx(node.bbMin, axis) + 0.5f * vecCompByIdx(extent, axis) };
 		
 		// in-place partition
 		UINT i{ node.leftFirstCnt.y };
 		UINT j{ i + node.leftFirstCnt.z - 1 };
 		while (i <= j) {
-			//if (splitPos <= vecCompByIdx(tri[triIdx[i++]].center, axis))
-			//	std::swap(triIdx[--i], triIdx[j--]);
-
-			if (vecCompByIdx(tri[m_bvhCBuf.triIdx[i].x].center, axis) < splitPos)
-				++i;
-			else
-				std::swap(m_bvhCBuf.triIdx[i].x, m_bvhCBuf.triIdx[j--].x);
+			if (splitPos <= vecCompByIdx(tri[m_bvhCBuf.triIdx[i++].x].center, axis))
+				std::swap(m_bvhCBuf.triIdx[--i].x, m_bvhCBuf.triIdx[j--].x);
 		}
 
 		// abort split if one of the sides is empty

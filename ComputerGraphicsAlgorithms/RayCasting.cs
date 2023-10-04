@@ -185,64 +185,54 @@ bool IntersectAABB(Ray ray, float3 bmin, float3 bmax)
     return tmax_min >= tmin_max && 0 < tmax_min && tmin_max < whnf.w;
 }
 
-Intsec bvhIntersection(Ray ray)
-{
-    BVHNode node = bvhNode[0];
+Intsec bvhIntersection(Ray ray) {
     Intsec best;
     best.t = whnf.w;
 
     // Create a stack to store the nodes to be processed.
-    uint stack[10];
+    uint stack[599];
     uint stackSize = 0;
     stack[stackSize++] = 0;
 
-    while (stackSize > 0)
-    {
-        uint nodeIdx = stack[--stackSize];
-        node = bvhNode[nodeIdx];
+    while (stackSize > 0) {
+        BVHNode node = bvhNode[stack[--stackSize]];
 
         if (!IntersectAABB(ray, node.bbMin, node.bbMax))
             continue;
 
-        if (node.leftFirstCnt.z > 0)
-        {
-            for (uint i = 0; i < node.leftFirstCnt.z; ++i)
-            {
-                uint rawId = triIdx[node.leftFirstCnt.y + i].x;
-                uint mId = rawId / 12;
-                uint tId = rawId % 12;
-
-                Ray mray;
-                mray.orig = mul(modelBufferInv[mId].mInv, ray.orig);
-                mray.dest = mul(modelBufferInv[mId].mInv, ray.dest);
-                mray.dir = normalize(mray.dest - mray.orig);
-
-                float4 v0 = vertices[indices[tId].x].position;
-                float4 v1 = vertices[indices[tId].y].position;
-                float4 v2 = vertices[indices[tId].z].position;
-
-                Intsec curr = rayIntsecTriangle(mray, v0, v1, v2);
-
-                if (whnf.z < curr.t && curr.t < best.t)
-                {
-                    best = curr;
-                    best.ray = ray;
-                    best.modelID = mId;
-                    best.triangleID = tId;
-                }
-            }
-        }
-        else
-        {
+        if (node.leftFirstCnt.z == 0) {
             stack[stackSize++] = node.leftFirstCnt.x;
             stack[stackSize++] = node.leftFirstCnt.x + 1;
+            continue;
+        }
+
+        for (uint i = 0; i < node.leftFirstCnt.z; ++i) {
+            uint mId = triIdx[node.leftFirstCnt.y + i].x / 12;
+            uint tId = triIdx[node.leftFirstCnt.y + i].x % 12;
+
+            Ray mray;
+            mray.orig = mul(modelBufferInv[mId].mInv, ray.orig);
+            mray.dest = mul(modelBufferInv[mId].mInv, ray.dest);
+            mray.dir = normalize(mray.dest - mray.orig);
+
+            float4 v0 = vertices[indices[tId].x].position;
+            float4 v1 = vertices[indices[tId].y].position;
+            float4 v2 = vertices[indices[tId].z].position;
+
+            Intsec curr = rayIntsecTriangle(mray, v0, v1, v2);
+
+            if (whnf.z < curr.t && curr.t < best.t)
+            {
+                best = curr;
+                best.ray = ray;
+                best.modelID = mId;
+                best.triangleID = tId;
+            }
         }
     }
 
     return best;
 }
-
-
 
 [numthreads(1, 1, 1)]
 void cs(uint3 DTid: SV_DispatchThreadID)

@@ -20,13 +20,8 @@ class CPUTimer : Timer {
 	steady_clock::time_point m_timeStop{};
 
 public:
-	void start() {
-		m_timeStart = high_resolution_clock::now();
-	}
-
-	void stop() {
-		m_timeStop = high_resolution_clock::now();
-	}
+	void start() { m_timeStart = high_resolution_clock::now(); }
+	void stop() { m_timeStop = high_resolution_clock::now(); }
 
 	double getTime() {
 		return duration<double, milli>(m_timeStop - m_timeStart).count();
@@ -75,14 +70,10 @@ public:
 
 	double getTime() {
 		UINT64 t0{};
-		while (m_pDeviceContext->GetData(
-			m_pTimeStart, &t0, sizeof(t0), 0
-		));
+		while (m_pDeviceContext->GetData(m_pTimeStart, &t0, sizeof(t0), 0));
 
 		UINT64 t{};
-		while (m_pDeviceContext->GetData(
-			m_pTimeStop, &t, sizeof(t), 0
-		));
+		while (m_pDeviceContext->GetData(m_pTimeStop, &t, sizeof(t), 0));
 
 		D3D11_QUERY_DATA_TIMESTAMP_DISJOINT disjoint{};
 		while (m_pDeviceContext->GetData(
