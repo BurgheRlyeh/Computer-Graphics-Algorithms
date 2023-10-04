@@ -180,6 +180,21 @@ HRESULT Cube::init(Matrix* positions, int num) {
 		THROW_IF_FAILED(hr);
 	}
 
+	// create bvh buffer
+	{
+		D3D11_BUFFER_DESC desc{
+			.ByteWidth{ sizeof(BVH::BVHConstBuf) },
+			.Usage{ D3D11_USAGE_DEFAULT },
+			.BindFlags{ D3D11_BIND_CONSTANT_BUFFER }
+		};
+
+		hr = m_pDevice->CreateBuffer(&desc, nullptr, &m_pBVHBuffer);
+		THROW_IF_FAILED(hr);
+
+		hr = SetResourceName(m_pBVHBuffer, "BVHBuffer");
+		THROW_IF_FAILED(hr);
+	}
+
 	// init models
 	{
 		Vector3 pos{ 0.0f, 0.0f, 0.0f };
@@ -549,6 +564,8 @@ void Cube::rayTracing(ID3D11SamplerState* pSampler, ID3D11Buffer* m_pSBuf, ID3D1
 	bvh->upd(m_instCount, m_modelBuffers.data());
 	bvh->build();
 	m_pCPUTimer->stop();
+
+	m_pDeviceContext->UpdateSubresource(m_pBVHBuffer, 0, nullptr, &bvh->m_bvhCBuf, 0, 0);
 	
 	ID3D11SamplerState* samplers[]{ pSampler };
 	m_pDeviceContext->CSSetSamplers(0, 1, samplers);
@@ -556,10 +573,10 @@ void Cube::rayTracing(ID3D11SamplerState* pSampler, ID3D11Buffer* m_pSBuf, ID3D1
 	ID3D11ShaderResourceView* resources[]{ m_pTextureView, m_pTextureViewNM };
 	m_pDeviceContext->CSSetShaderResources(0, 2, resources);
 
-	ID3D11Buffer* constBuffers[4]{
-		m_pModelBufferInst, m_pVIBuffer, m_pRTBuf, m_pModelBufferInv
+	ID3D11Buffer* constBuffers[5]{
+		m_pModelBufferInst, m_pVIBuffer, m_pRTBuf, m_pModelBufferInv, m_pBVHBuffer
 	};
-	m_pDeviceContext->CSSetConstantBuffers(0, 4, constBuffers);
+	m_pDeviceContext->CSSetConstantBuffers(0, 5, constBuffers);
 
 	// unbind rtv
 	ID3D11RenderTargetView* nullRtv{};

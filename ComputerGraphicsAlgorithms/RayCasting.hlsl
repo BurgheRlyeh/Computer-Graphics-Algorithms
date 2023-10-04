@@ -10,7 +10,7 @@ struct ModelBuffer
 
 cbuffer ModelBufferInst: register(b0)
 {
-    ModelBuffer modelBuffer[50];
+    ModelBuffer modelBuffer[25];
 };
 
 struct Vertex
@@ -42,7 +42,19 @@ struct ModelBufferInv
 
 cbuffer ModelBufferInv: register(b3)
 {
-    ModelBufferInv modelBufferInv[50];
+    ModelBufferInv modelBufferInv[25];
+}
+
+struct BVHNode
+{
+    float4 bbMin, bbMax;
+    uint4 leftFirstCnt;
+};
+
+cbuffer BVH: register(b4)
+{
+    BVHNode bvhNode[2 * 12 * 25 - 1];
+    uint4 triIdx[12 * 25];
 }
 
 struct Ray
@@ -98,17 +110,17 @@ Intsec rayIntsecTriangle(Ray ray, float4 v0, float4 v1, float4 v2)
     intsec.t = whnf.w;
 
     // edges
-    float3 e1 = v1 - v0;
-    float3 e2 = v2 - v0;
+    float3 e1 = v1.xyz - v0.xyz;
+    float3 e2 = v2.xyz - v0.xyz;
 
-    float3 h = cross(ray.dir, e2);
+    float3 h = cross(ray.dir.xyz, e2);
     float a = dot(e1, h);
 
     // check is parallel
     if (abs(a) < 1e-8)
         return intsec;
 
-    float3 s = ray.orig - v0;
+    float3 s = ray.orig.xyz - v0.xyz;
     intsec.u = dot(s, h) / a;
 
     // check u range
@@ -116,7 +128,7 @@ Intsec rayIntsecTriangle(Ray ray, float4 v0, float4 v1, float4 v2)
         return intsec;
 
     float3 q = cross(s, e1);
-    intsec.v = dot(ray.dir, q) / a;
+    intsec.v = dot(ray.dir.xyz, q) / a;
 
     // check v + u range
     if (intsec.v < 0.0 || 1.0 < intsec.u + intsec.v)
@@ -159,21 +171,153 @@ Intsec CalculateIntersection(Ray ray)
     return best;
 }
 
+static Intsec best;
+
+bool IntersectAABB(Ray ray, float4 bmin, float4 bmax)
+{
+    float tx1 = (bmin.x - ray.orig.x) / ray.dir.x, tx2 = (bmax.x - ray.orig.x) / ray.dir.x;
+    float tmin = min(tx1, tx2);
+    float tmax = max(tx1, tx2);
+
+    float ty1 = (bmin.y - ray.orig.y) / ray.dir.y, ty2 = (bmax.y - ray.orig.y) / ray.dir.y;
+    tmin = max(tmin, min(ty1, ty2));
+    tmax = min(tmax, max(ty1, ty2));
+
+    float tz1 = (bmin.z - ray.orig.z) / ray.dir.z, tz2 = (bmax.z - ray.orig.z) / ray.dir.z;
+    tmin = max(tmin, min(tz1, tz2));
+    tmax = min(tmax, max(tz1, tz2));
+
+    return tmax >= tmin && tmax > 0; // && tmin < t;
+}
+
+//Intsec bvhInstersection(Ray ray, uint nodeIdx)
+//{
+//    BVHNode node = bvhNode[nodeIdx];
+//    if (!IntersectAABB(ray, node.bbMin, node.bbMax))
+//    {
+//        Intsec best;
+//        best.t = whnf.w;
+//        return best;
+//    }
+//    if (node.leftFirstCnt.z > 0)
+//    {
+//        Intsec best;
+//        best.t = whnf.w;
+
+//        for (uint i = 0; i < node.leftFirstCnt.z; ++i)
+//        {
+//            uint rawId = triIdx[node.leftFirstCnt.y + i];
+//            uint mId = rawId / 12;
+//            uint tId = rawId % 12;
+
+//            Ray mray;
+//            mray.orig = mul(modelBufferInv[mId].mInv, ray.orig);
+//            mray.dest = mul(modelBufferInv[mId].mInv, ray.dest);
+//            mray.dir = normalize(mray.dest - mray.orig);
+
+//            float4 v0 = vertices[indices[tId].x].position;
+//            float4 v1 = vertices[indices[tId].y].position;
+//            float4 v2 = vertices[indices[tId].z].position;
+
+//            Intsec curr = rayIntsecTriangle(mray, v0, v1, v2);
+
+//            if (whnf.z < curr.t && curr.t < best.t)
+//            {
+//                best = curr;
+//                best.ray = ray;
+//                best.modelID = mId;
+//                best.triangleID = tId;
+//            }
+//        }
+
+//        return best;
+//    }
+//    else
+//    {
+//        bvhInstersection(ray, node.leftFirstCnt.x);
+//        bvhInstersection(ray, node.leftFirstCnt.x + 1);
+//    }
+//}
+Intsec bvhIntersection(Ray ray)
+{
+    BVHNode node = bvhNode[0];
+    Intsec best;
+    best.t = whnf.w;
+
+    // Create a stack to store the nodes to be processed.
+    uint stack[10];
+    uint stackSize = 0;
+    stack[stackSize++] = 0;
+
+    while (stackSize > 0)
+    {
+        uint nodeIdx = stack[--stackSize];
+        node = bvhNode[nodeIdx];
+
+        if (IntersectAABB(ray, node.bbMin, node.bbMax))
+        {
+            if (node.leftFirstCnt.z > 0)
+            {
+                for (uint i = 0; i < node.leftFirstCnt.z; ++i)
+                {
+                    uint rawId = triIdx[node.leftFirstCnt.y + i].x;
+                    uint mId = rawId / 12;
+                    uint tId = rawId % 12;
+
+                    Ray mray;
+                    mray.orig = mul(modelBufferInv[mId].mInv, ray.orig);
+                    mray.dest = mul(modelBufferInv[mId].mInv, ray.dest);
+                    mray.dir = normalize(mray.dest - mray.orig);
+
+                    float4 v0 = vertices[indices[tId].x].position;
+                    float4 v1 = vertices[indices[tId].y].position;
+                    float4 v2 = vertices[indices[tId].z].position;
+
+                    Intsec curr = rayIntsecTriangle(mray, v0, v1, v2);
+
+                    if (whnf.z < curr.t && curr.t < best.t)
+                    {
+                        best = curr;
+                        best.ray = ray;
+                        best.modelID = mId;
+                        best.triangleID = tId;
+                    }
+                }
+            }
+            else
+            {
+                stack[stackSize++] = node.leftFirstCnt.x;
+                stack[stackSize++] = node.leftFirstCnt.x + 1;
+            }
+        }
+    }
+
+    return best;
+}
+
+
+
 [numthreads(1, 1, 1)]
 void main(uint3 DTid: SV_DispatchThreadID)
 {
     Ray ray = generateRay(DTid.xy);
-    Intsec best = CalculateIntersection(ray);
+
+    best.t = whnf.w;
+    //Intsec best = CalculateIntersection(ray);
+    Intsec best = bvhIntersection(ray);
 
     if (best.t >= whnf.w)
         return;
 
-    float depth = best.t * dot(ray.dir, camDir.xyz);
+    float depth = best.t * dot(ray.dir, camDir);
 
     float4 colorNear = float4(1.f, 1.f, 1.f, 1.f);
     float4 colorFar = float4(0.f, 0.f, 0.f, 1.f);
 
     float4 finalCl = lerp(colorNear, colorFar, 1.f - 1.f / depth);
+
+    texOutput[DTid.xy] = finalCl;
+    return;
 
     Vertex v0 = vertices[indices[best.triangleID].x];
     Vertex v1 = vertices[indices[best.triangleID].y];
@@ -181,7 +325,7 @@ void main(uint3 DTid: SV_DispatchThreadID)
 
     float u = best.u;
     float v = best.v;
-    float2 uv = (1 - u - v) * v0.uv + u * v1.uv + v * v2.uv;
+    float2 uv = (1 - u - v) * v0.uv.xy + u * v1.uv.xy + v * v2.uv.xy;
 
     float4 color = colorTexture.SampleLevel(
         colorSampler,

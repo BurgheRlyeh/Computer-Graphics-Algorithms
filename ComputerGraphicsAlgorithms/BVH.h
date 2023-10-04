@@ -16,21 +16,13 @@ class BVH {
 
 	struct BVHNode {
 		Vector4 bbMin, bbMax;
-		UINT left;
-		UINT firstIdx, cnt;
-	};
-
-	struct BVHConstBuffer {
-		Vector4 bbMin, bbMax;
 		XMUINT4 leftFirstCnt;
 	};
 
-	static const UINT N{ 600 };
+	static const UINT N{ 300 };
 
 	Tri tri[N]{};
-	UINT triIdx[N]{};
-
-	BVHNode bvhNode[2 * N - 1]{};
+	
 	UINT rootNodeIdx{};
 	UINT nodesUsed{ 1 };
 
@@ -39,6 +31,11 @@ class BVH {
 	UINT cnt{};
 
 public:
+	struct BVHConstBuf {
+		BVHNode bvhNode[2 * N - 1]{};
+		XMUINT4 triIdx[N]{};
+	} m_bvhCBuf;
+
 	BVH(Cube* cube):
 		cube(cube)
 	{}
@@ -61,12 +58,12 @@ public:
 	void build() {
 		for (int i{}; i < 12 * cnt; ++i) {
 			tri[i].center = (tri[i].v0 + tri[i].v1 + tri[i].v2) / 3.f;
-			triIdx[i] = i;
+			m_bvhCBuf.triIdx[i].x = i;
 		}
-		BVHNode& root = bvhNode[rootNodeIdx];
-		root.left = 0;
-		root.firstIdx = 0;
-		root.cnt = 12 * cnt;
+		BVHNode& root = m_bvhCBuf.bvhNode[rootNodeIdx];
+		root.leftFirstCnt.x = 0;
+		root.leftFirstCnt.y = 0;
+		root.leftFirstCnt.z = 12 * cnt;
 		updNodeBounds(rootNodeIdx);
 		// subdivide recursively
 		Subdivide(rootNodeIdx);
@@ -74,12 +71,12 @@ public:
 
 private:
 	void updNodeBounds(UINT nodeIdx) {
-		BVHNode& node = bvhNode[nodeIdx];
+		BVHNode& node = m_bvhCBuf.bvhNode[nodeIdx];
 		node.bbMin = { 1e30f, 1e30f, 1e30f };
 		node.bbMax = { -1e30f, -1e30f, -1e30f };
-		UINT first{ node.firstIdx };
-		for (UINT i{}; i < node.cnt; ++i) {
-			Tri& leafTri = tri[triIdx[first + i]];
+		UINT first{ node.leftFirstCnt.y };
+		for (UINT i{}; i < node.leftFirstCnt.z; ++i) {
+			Tri& leafTri = tri[m_bvhCBuf.triIdx[first + i].x];
 			node.bbMin = Vector4::Min(node.bbMin, leafTri.v0);
 			node.bbMin = Vector4::Min(node.bbMin, leafTri.v1);
 			node.bbMin = Vector4::Min(node.bbMin, leafTri.v2);
@@ -101,8 +98,8 @@ private:
 
 	void Subdivide(UINT nodeIdx) {
 		// terminate recursion
-		BVHNode& node{ bvhNode[nodeIdx] };
-		if (node.cnt <= 2)
+		BVHNode& node{ m_bvhCBuf.bvhNode[nodeIdx] };
+		if (node.leftFirstCnt.z <= 2)
 			return;
 
 		// determine split axis and position
@@ -120,34 +117,34 @@ private:
 		float splitPos{ vecCompByIdx(node.bbMin, axis) + 0.5f * vecCompByIdx(extent, axis) };
 		
 		// in-place partition
-		UINT i{ node.firstIdx };
-		UINT j{ i + node.cnt - 1 };
+		UINT i{ node.leftFirstCnt.y };
+		UINT j{ i + node.leftFirstCnt.z - 1 };
 		while (i <= j) {
 			//if (splitPos <= vecCompByIdx(tri[triIdx[i++]].center, axis))
 			//	std::swap(triIdx[--i], triIdx[j--]);
 
-			if (vecCompByIdx(tri[triIdx[i]].center, axis) < splitPos)
+			if (vecCompByIdx(tri[m_bvhCBuf.triIdx[i].x].center, axis) < splitPos)
 				++i;
 			else
-				std::swap(triIdx[i], triIdx[j--]);
+				std::swap(m_bvhCBuf.triIdx[i].x, m_bvhCBuf.triIdx[j--].x);
 		}
 
 		// abort split if one of the sides is empty
-		UINT leftCnt{ i - node.firstIdx };
-		if (leftCnt == 0 || leftCnt == node.cnt)
+		UINT leftCnt{ i - node.leftFirstCnt.y };
+		if (leftCnt == 0 || leftCnt == node.leftFirstCnt.z)
 			return;
 
 		// create child nodes
 		int leftIdx = nodesUsed++;
-		bvhNode[leftIdx].firstIdx = node.firstIdx;
-		bvhNode[leftIdx].cnt = leftCnt;
+		m_bvhCBuf.bvhNode[leftIdx].leftFirstCnt.y = node.leftFirstCnt.y;
+		m_bvhCBuf.bvhNode[leftIdx].leftFirstCnt.z = leftCnt;
 
 		int rightIdx = nodesUsed++;
-		bvhNode[rightIdx].firstIdx = i;
-		bvhNode[rightIdx].cnt = node.cnt - leftCnt;
+		m_bvhCBuf.bvhNode[rightIdx].leftFirstCnt.y = i;
+		m_bvhCBuf.bvhNode[rightIdx].leftFirstCnt.z = node.leftFirstCnt.z - leftCnt;
 
-		node.left = leftIdx;
-		node.cnt = 0;
+		node.leftFirstCnt.x = leftIdx;
+		node.leftFirstCnt.z = 0;
 		updNodeBounds(leftIdx);
 		updNodeBounds(rightIdx);
 

@@ -18,7 +18,7 @@ class GPUTimer;
 
 class Cube {
 public:
-	static const int MaxInstances{ 50 };
+	static const int MaxInstances{ 25 };
 
 public:
 	typedef struct TextureTangentVertex {
@@ -137,6 +137,7 @@ private:
 	};
 	std::vector<ModelBufferInv> m_modelBuffersInv{ MaxInstances };
 	ID3D11Buffer* m_pModelBufferInv{};
+	ID3D11Buffer* m_pBVHBuffer{};
 
 	ID3D11UnorderedAccessView* m_pRTTexture{};
 	//VIBuffer m_viBuffer{};
