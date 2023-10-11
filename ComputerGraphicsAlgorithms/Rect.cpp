@@ -4,7 +4,7 @@
 using namespace DirectX;
 using namespace DirectX::SimpleMath;
 
-HRESULT Rect::init(Vector3* positions, Vector4* colors, int num) {
+HRESULT Rect::init(Vector4* positions, Vector4* colors, int num) {
     m_pModelBuffers.resize(num);
     
     HRESULT hr{ S_OK };
@@ -18,23 +18,23 @@ HRESULT Rect::init(Vector3* positions, Vector4* colors, int num) {
 
     for (int j{}; j < 2; ++j) {
         for (int i{}; i < 4; ++i) {
-            m_boundingRects[j].vmin = {
-                XMMax(m_boundingRects[j].vmin.x, vertices[i].point.x),
-                XMMax(m_boundingRects[j].vmin.y, vertices[i].point.y),
-                XMMax(m_boundingRects[j].vmin.z, vertices[i].point.z)
+            m_boundingRects[j].bmin = {
+                XMMax(m_boundingRects[j].bmin.x, vertices[i].point.x),
+                XMMax(m_boundingRects[j].bmin.y, vertices[i].point.y),
+                XMMax(m_boundingRects[j].bmin.z, vertices[i].point.z)
             };
 
-            m_boundingRects[j].vmax = {
-                XMMax(m_boundingRects[j].vmax.x, vertices[i].point.x),
-                XMMax(m_boundingRects[j].vmax.y, vertices[i].point.y),
-                XMMax(m_boundingRects[j].vmax.z, vertices[i].point.z)
+            m_boundingRects[j].bmax = {
+                XMMax(m_boundingRects[j].bmax.x, vertices[i].point.x),
+                XMMax(m_boundingRects[j].bmax.y, vertices[i].point.y),
+                XMMax(m_boundingRects[j].bmax.z, vertices[i].point.z)
             };
         }
     }
-    m_boundingRects[0].vmin += positions[0];
-    m_boundingRects[0].vmax += positions[0];
-    m_boundingRects[1].vmin += positions[1];
-    m_boundingRects[1].vmax += positions[1];
+    m_boundingRects[0].bmin += positions[0];
+    m_boundingRects[0].bmax += positions[0];
+    m_boundingRects[1].bmin += positions[1];
+    m_boundingRects[1].bmax += positions[1];
 
     // create vertex buffer
     {

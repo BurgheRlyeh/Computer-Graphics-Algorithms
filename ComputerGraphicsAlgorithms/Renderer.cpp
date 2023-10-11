@@ -690,9 +690,9 @@ HRESULT Renderer::initScene() {
 	THROW_IF_FAILED(hr);
 
 	m_pRect = new Rect(m_pDevice, m_pDeviceContext);
-	Vector3 rectPositions[]{
-		{ 1.0f, 0, 0.0f },
-		{ 1.2f, 0, 0.0f }
+	Vector4 rectPositions[]{
+		{ 1.0f, 0.f, 0.f, 0.f },
+		{ 1.2f, 0.f, 0.f, 0.f }
 	};
 	Vector4 rectColors[]{
 		{ 1.0f, 0.25f, 0.0f, 0.5f },

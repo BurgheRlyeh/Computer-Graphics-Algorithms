@@ -26,6 +26,11 @@ public:
 	double getTime() {
 		return duration<double, milli>(m_timeStop - m_timeStart).count();
 	}
+
+	double getCurrent() {
+		steady_clock::time_point timeCurr{ high_resolution_clock::now() };
+		return duration<double, milli>(timeCurr - m_timeStart).count();
+	}
 };
 
 class GPUTimer : Timer {
@@ -69,16 +74,14 @@ public:
 	}
 
 	double getTime() {
-		UINT64 t0{};
+		UINT64 t0, t;
 		while (m_pDeviceContext->GetData(m_pTimeStart, &t0, sizeof(t0), 0));
-
-		UINT64 t{};
 		while (m_pDeviceContext->GetData(m_pTimeStop, &t, sizeof(t), 0));
 
 		D3D11_QUERY_DATA_TIMESTAMP_DISJOINT disjoint{};
-		while (m_pDeviceContext->GetData(
+		m_pDeviceContext->GetData(
 			m_pDisjoint, &disjoint, sizeof(disjoint), 0
-		));
+		);
 
 		return disjoint.Disjoint ? 0.0 : 1e3 * (t - t0) / disjoint.Frequency;
 	}

@@ -197,32 +197,27 @@ HRESULT Cube::init(Matrix* positions, int num) {
 
 	// init models
 	{
-		Vector3 pos{ 0.0f, 0.0f, 0.0f };
-
 		int useNM{ 1 };
 		m_modelBuffers[0].settings = {
 			0.0f, m_modelRotationSpeed, 0.0f, *reinterpret_cast<float*>(&useNM)
 		};
-		m_modelBuffers[0].posAndAng = { 0.f, 0.0f, 0.0f, 0.0f };
+		m_modelBuffers[0].posAndAng = { 0.0f, 0.0f, 0.0f, 0.0f };
 		m_modelBuffers[0].updateMatrices();
 		m_modelBuffersInv[0].modelMatrixInv = m_modelBuffers[0].matrix.Invert();
 
-		Vector3 diag{ sqrtf(2.0f), 1.f, sqrtf(2.0f) };
-		m_modelBBs[0].vmin = pos - diag / 2;
-		m_modelBBs[0].vmax = pos + diag / 2;
-
-
-		pos = { 2.0f, 0.0f, 0.0f };
+		Vector4 diag{ sqrtf(2.0f), 1.f, sqrtf(2.0f), 0.0f };
+		m_modelBBs[0].bmin = m_modelBuffers[0].posAndAng - diag / 2;
+		m_modelBBs[0].bmax = m_modelBuffers[0].posAndAng + diag / 2;
 
 		m_modelBuffers[1].settings = {
 			64.0f, 0.0f, 0.0f, *reinterpret_cast<float*>(&useNM)
 		};
-		m_modelBuffers[1].posAndAng = { pos.x, pos.y, pos.z, 0.0f };
+		m_modelBuffers[1].posAndAng = { 2.0f, 0.0f, 0.0f, 0.0f };
 		m_modelBuffers[1].updateMatrices();
 		m_modelBuffersInv[1].modelMatrixInv = m_modelBuffers[1].matrix.Invert();
 
-		m_modelBBs[1].vmin = pos - Vector3{ 0.5f, 0.5f, 0.5f };
-		m_modelBBs[1].vmax = pos + Vector3{ 0.5f, 0.5f, 0.5f };
+		m_modelBBs[1].bmin = m_modelBuffers[1].posAndAng - Vector4{ 0.5f, 0.5f, 0.5f, 0.0f };
+		m_modelBBs[1].bmax = m_modelBuffers[1].posAndAng + Vector4{ 0.5f, 0.5f, 0.5f, 0.0f };
 
 		m_updateCullParams = true;
 	}
@@ -573,10 +568,10 @@ void Cube::rayTracing(ID3D11SamplerState* pSampler, ID3D11Buffer* m_pSBuf, ID3D1
 	ID3D11ShaderResourceView* resources[]{ m_pTextureView, m_pTextureViewNM };
 	m_pDeviceContext->CSSetShaderResources(0, 2, resources);
 
-	ID3D11Buffer* constBuffers[5]{
-		m_pModelBufferInst, m_pVIBuffer, m_pRTBuf, m_pModelBufferInv, m_pBVHBuffer
+	ID3D11Buffer* constBuffers[6]{
+		m_pSBuf, m_pModelBufferInst, m_pVIBuffer, m_pRTBuf, m_pModelBufferInv, m_pBVHBuffer
 	};
-	m_pDeviceContext->CSSetConstantBuffers(0, 5, constBuffers);
+	m_pDeviceContext->CSSetConstantBuffers(0, 6, constBuffers);
 
 	// unbind rtv
 	ID3D11RenderTargetView* nullRtv{};
@@ -766,15 +761,15 @@ void Cube::updateCullParams() {
 
 	for (UINT i{}; i < m_instCount; ++i) {
 		cullParams.bbMin[i] = {
-			m_modelBBs[i].vmin.x,
-			m_modelBBs[i].vmin.y,
-			m_modelBBs[i].vmin.z,
+			m_modelBBs[i].bmin.x,
+			m_modelBBs[i].bmin.y,
+			m_modelBBs[i].bmin.z,
 			0.0f
 		};
 		cullParams.bbMax[i] = {
-			m_modelBBs[i].vmax.x,
-			m_modelBBs[i].vmax.y,
-			m_modelBBs[i].vmax.z,
+			m_modelBBs[i].bmax.x,
+			m_modelBBs[i].bmax.y,
+			m_modelBBs[i].bmax.z,
 			0.0f
 		};
 	}
@@ -785,7 +780,7 @@ void Cube::updateCullParams() {
 }
 
 // is box inside
-bool isBoxInside(const Plane frustum[6], const Vector3& bbMin, const Vector3& bbMax) {
+bool isBoxInside(const Plane frustum[6], const Vector4& bbMin, const Vector4& bbMax) {
 	for (int i{}; i < 6; ++i) {
 		// выбираем ближайшую точку
 		Vector4 p{
@@ -829,7 +824,7 @@ void Cube::cullBoxes(ID3D11Buffer* m_pSceneBuffer, Camera& camera, float aspectR
 
 		m_instVisCount = 0;
 		for (UINT i{}; i < m_instCount; ++i) {
-			if (isBoxInside(frustum, m_modelBBs[i].vmin, m_modelBBs[i].vmax)) {
+			if (isBoxInside(frustum, m_modelBBs[i].bmin, m_modelBBs[i].bmax)) {
 				ids[m_instVisCount++].x = i;
 			}
 		}
@@ -909,14 +904,14 @@ void Cube::initModel(ModelBuffer& modelBuffer, AABB& bb) {
 		*reinterpret_cast<float*>(&useNM)
 	};
 
-	Vector3 pos{
+	modelBuffer.posAndAng = {
 		7.0f * randNormf() - 3.5f,
 		7.0f * randNormf() - 3.5f,
-		7.0f * randNormf() - 3.5f
+		7.0f * randNormf() - 3.5f,
+		0.f
 	};
-	modelBuffer.posAndAng = { pos.x, pos.y, pos.z, 0.0f };
 
-	Vector3 diag{ sqrtf(2.0f), 1.f, sqrtf(2.0f) };
-	bb.vmin = pos - diag / 2;
-	bb.vmax = pos + diag / 2;
+	Vector4 diag{ sqrtf(2.0f), 1.f, sqrtf(2.0f), 0.f };
+	bb.bmin = modelBuffer.posAndAng - diag / 2;
+	bb.bmax = modelBuffer.posAndAng + diag / 2;
 }

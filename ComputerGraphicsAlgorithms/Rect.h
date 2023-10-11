@@ -42,7 +42,7 @@ public:
 		m_pDevice(device),
 		m_pDeviceContext(deviceContext) {}
 
-	HRESULT init(DirectX::SimpleMath::Vector3* positions, DirectX::SimpleMath::Vector4* colors, int num);
+	HRESULT init(DirectX::SimpleMath::Vector4* positions, DirectX::SimpleMath::Vector4* colors, int num);
 	void term();
 
 	void update(DirectX::SimpleMath::Matrix matrix);

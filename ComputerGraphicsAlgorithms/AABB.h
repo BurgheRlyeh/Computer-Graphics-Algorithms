@@ -1,21 +1,33 @@
 #pragma once
 
+#include <limits>
+
 #include "framework.h"
 
+#undef min
+#undef max
+
 struct AABB {
-    DirectX::SimpleMath::Vector3 vmin{
-        INFINITY, INFINITY, INFINITY
+    DirectX::SimpleMath::Vector4 bmin{
+        std::numeric_limits<float>::max(),
+        std::numeric_limits<float>::max(),
+        std::numeric_limits<float>::max(),
+        0
     };
 
-    DirectX::SimpleMath::Vector3 vmax{
-        -INFINITY, -INFINITY, -INFINITY
+    DirectX::SimpleMath::Vector4 bmax{
+        std::numeric_limits<float>::min(),
+        std::numeric_limits<float>::min(),
+        std::numeric_limits<float>::min(),
+        0
     };
 
-    inline DirectX::SimpleMath::Vector3 getVert(int idx) const {
+    inline DirectX::SimpleMath::Vector4 getVert(int idx) const {
         return {
-            !(idx & 1) ? vmin.x : vmax.x,
-            !(idx & 2) ? vmin.y : vmax.y,
-            !(idx & 4) ? vmin.z : vmax.z
+            idx & 1 ? bmax.x : bmin.x,
+            idx & 2 ? bmax.y : bmin.y,
+            idx & 4 ? bmax.z : bmin.z,
+            0
         };
     }
 };
