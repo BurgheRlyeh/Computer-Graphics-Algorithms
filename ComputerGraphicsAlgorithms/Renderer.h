@@ -17,6 +17,7 @@
 #include "AABB.h"
 #include "PostProcess.h"
 #include "Timer.h"
+#include "BVH.h"
 
 #include "SimpleMath.h"
 
@@ -33,6 +34,9 @@ class LightSphere;
 struct Camera;
 struct AABB;
 struct PostProcess;
+class CPUTimer;
+class GPUTimer;
+class BVH;
 
 class Renderer {
 	typedef struct SceneBuffer {
@@ -142,6 +146,14 @@ class Renderer {
 
 	DirectX::SimpleMath::Matrix m_v{};
 	DirectX::SimpleMath::Matrix m_p{};
+
+	CPUTimer m_CPUTimer{};
+	UINT m_frameCounter{};
+	double m_fps{};
+	double m_bvhTime{};
+	double m_bvhTimeAvg{};
+	double m_cubeTime{};
+	double m_cubeTimeAvg{};
 
 public:
 	MouseHandler m_mouseHandler;

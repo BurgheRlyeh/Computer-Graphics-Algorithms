@@ -339,6 +339,10 @@ HRESULT Cube::init(Matrix* positions, int num) {
 		m_pCPUTimer = new CPUTimer();
 	}
 
+	for (int i{}; i < 24; ++i) {
+		bvh_vertices[i] = m_viBuffer.vertices[i].point;
+	}
+
 	return hr;
 }
 
@@ -470,12 +474,14 @@ void Cube::update(float delta, bool isRotate) {
 		m_modelBuffers[i].posAndAng.w += delta * m_modelBuffers[i].settings.y;
 		m_modelBuffers[i].updateMatrices();
 		m_modelBuffers[i].matrix.Invert(m_modelBuffersInv[i].modelMatrixInv);
+
+		bvh_matrices[i] = m_modelBuffers[i].matrix;
 	}
 
-	/*for (auto& model : m_modelBuffers) {
-		model.posAndAng.w += delta * model.settings.y;
-		model.updateMatrices();
-	}*/
+	m_pCPUTimer->start();
+	bvh.upd(m_instCount, bvh_vertices, m_viBuffer.indices, bvh_matrices);
+	bvh.build();
+	m_pCPUTimer->stop();
 
 	m_pDeviceContext->UpdateSubresource(m_pModelBufferInst, 0, nullptr, m_modelBuffers.data(), 0, 0);
 	m_pDeviceContext->UpdateSubresource(m_pModelBufferInv, 0, nullptr, m_modelBuffersInv.data(), 0, 0);
@@ -554,13 +560,7 @@ void Cube::rayTracingUpdate(ID3D11Texture2D* tex) {
 }
 
 void Cube::rayTracing(ID3D11SamplerState* pSampler, ID3D11Buffer* m_pSBuf, ID3D11Buffer* m_pRTBuf, int w, int h) {
-	m_pCPUTimer->start();
-	BVH* bvh = new BVH(this);
-	bvh->upd(m_instCount, m_modelBuffers.data());
-	bvh->build();
-	m_pCPUTimer->stop();
-
-	m_pDeviceContext->UpdateSubresource(m_pBVHBuffer, 0, nullptr, &bvh->m_bvhCBuf, 0, 0);
+	m_pDeviceContext->UpdateSubresource(m_pBVHBuffer, 0, nullptr, &bvh.m_bvhCBuf, 0, 0);
 	
 	ID3D11SamplerState* samplers[]{ pSampler };
 	m_pDeviceContext->CSSetSamplers(0, 1, samplers);

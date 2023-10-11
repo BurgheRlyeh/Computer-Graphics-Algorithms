@@ -17,7 +17,7 @@ class BVH {
 	};
 
 	struct BVHNode {
-		AABB bb;
+		AABB bb{};
 		XMINT4 leftFirstCntParent;
 	};
 
@@ -26,44 +26,43 @@ class BVH {
 	Tri tri[N]{};
 	
 	INT rootNodeIdx{};
-	INT nodesUsed{ 1 };
-
-	Cube* cube{};
-
-	INT cnt{};
 
 public:
+	INT cnt{};
+	INT nodesUsed{ 1 };
+	INT leafs{};
+	INT trianglesPerLeaf{ 2 };
+	INT depthMin{ 599 };
+	INT depthMax{ -1 };
+
 	struct BVHConstBuf {
 		BVHNode bvhNode[2 * N - 1]{};
 		XMINT4 triIdx[N]{};
 	} m_bvhCBuf;
 
-	BVH(Cube* cube):
-		cube(cube)
-	{}
-
-	//void upd(INT instCnt, Vector4* vertices, INT verticesCnt, XMINT4* indices, INT indicesCnt, Matrix* modelMatrices) {
-	void upd(UINT instCnt, Cube::ModelBuffer* modelBuffers) {
+	void upd(INT instCnt, Vector4(&vertices)[24], XMINT4(&indices)[12], Matrix(&modelMatrices)[25]) {
 		cnt = instCnt;
+		nodesUsed = 1;
+		leafs = 0;
+		//trianglesPerLeaf = 0;
+		depthMax = -1;
+		depthMin = 599;
 
 		for (INT m{}; m < instCnt; ++m) {
-			Matrix matrix{ modelBuffers[m].matrix };
-
 			for (INT tr{}; tr < 12; ++tr) {
 				INT id{ 12 * m + tr };
-				XMINT4 trIds{ cube->m_viBuffer.indices[tr] };
+				XMINT4 trIds{ indices[tr] };
 
-				tri[id].v0 = Vector4::Transform(cube->m_viBuffer.vertices[trIds.x].point, matrix);
-				tri[id].v1 = Vector4::Transform(cube->m_viBuffer.vertices[trIds.y].point, matrix);
-				tri[id].v2 = Vector4::Transform(cube->m_viBuffer.vertices[trIds.z].point, matrix);
+				tri[id].v0 = Vector4::Transform(vertices[trIds.x], modelMatrices[m]);
+				tri[id].v1 = Vector4::Transform(vertices[trIds.y], modelMatrices[m]);
+				tri[id].v2 = Vector4::Transform(vertices[trIds.z], modelMatrices[m]);
+
+				m_bvhCBuf.triIdx[id] = { id, 0, 0, 0 };
 			}
 		}
 	}
 
 	void build() {
-		for (int i{}; i < 12 * cnt; ++i) {
-			m_bvhCBuf.triIdx[i].x = i;
-		}
 		BVHNode& root = m_bvhCBuf.bvhNode[rootNodeIdx];
 		root.leftFirstCntParent = {
 			0, 0, 12 * cnt, -1
@@ -76,8 +75,7 @@ public:
 private:
 	void updNodeBounds(INT nodeIdx) {
 		BVHNode& node = m_bvhCBuf.bvhNode[nodeIdx];
-		node.bb.bmin = { 1e30f, 1e30f, 1e30f };
-		node.bb.bmax = { -1e30f, -1e30f, -1e30f };
+		node.bb = {};
 		INT first{ node.leftFirstCntParent.y };
 		for (INT i{}; i < node.leftFirstCntParent.z; ++i) {
 			Tri& leafTri = tri[m_bvhCBuf.triIdx[first + i].x];
@@ -102,11 +100,29 @@ private:
 		}
 	}
 
+	int depth(INT id) {
+		INT d{ 0 };
+		while (id != 0) {
+			id = m_bvhCBuf.bvhNode[id].leftFirstCntParent.w;
+			++d;
+		}
+		return d;
+	}
+
 	void Subdivide(INT nodeIdx) {
 		// terminate recursion
 		BVHNode& node{ m_bvhCBuf.bvhNode[nodeIdx] };
-		if (node.leftFirstCntParent.z <= 2)
+		if (node.leftFirstCntParent.z <= trianglesPerLeaf) {
+			++leafs;
+			INT d = depth(nodeIdx);
+			if (d < depthMin) {
+				depthMin = d;
+			}
+			if (d > depthMax) {
+				depthMax = d;
+			}
 			return;
+		}
 
 		// determine split axis and position
 		Vector4 extent{ node.bb.bmax - node.bb.bmin };
@@ -127,8 +143,17 @@ private:
 
 		// abort split if one of the sides is empty
 		INT leftCnt{ i - node.leftFirstCntParent.y };
-		if (leftCnt == 0 || leftCnt == node.leftFirstCntParent.z)
+		if (leftCnt == 0 || leftCnt == node.leftFirstCntParent.z) {
+			++leafs;
+			INT d = depth(nodeIdx);
+			if (d < depthMin) {
+				depthMin = d;
+			}
+			if (d > depthMax) {
+				depthMax = d;
+			}
 			return;
+		}
 
 		// create child nodes
 		int leftIdx{ nodesUsed++ };
@@ -146,7 +171,7 @@ private:
 		node.leftFirstCntParent = {
 			leftIdx, -1, 0, node.leftFirstCntParent.w
 		};
-		
+
 		// recurse
 		Subdivide(leftIdx);
 		Subdivide(rightIdx);

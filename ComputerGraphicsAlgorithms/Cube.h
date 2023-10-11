@@ -8,6 +8,7 @@
 #include "Camera.h"
 #include "AABB.h"
 #include "Timer.h"
+#include "BVH.h"
 
 struct TextureDesc;
 class Renderer;
@@ -15,6 +16,7 @@ struct Camera;
 struct AABB;
 class CPUTimer;
 class GPUTimer;
+class BVH;
 
 class Cube {
 public:
@@ -93,6 +95,8 @@ public:
 		};
 	} m_viBuffer{};
 
+	BVH bvh{};
+
 	struct CullParams {
 		DirectX::XMINT4 shapeCount{}; // x - shapes count
 		DirectX::SimpleMath::Vector4 bbMin[MaxInstances]{};
@@ -138,6 +142,8 @@ private:
 	std::vector<ModelBufferInv> m_modelBuffersInv{ MaxInstances };
 	ID3D11Buffer* m_pModelBufferInv{};
 	ID3D11Buffer* m_pBVHBuffer{};
+	DirectX::SimpleMath::Matrix bvh_matrices[MaxInstances]{};
+	DirectX::SimpleMath::Vector4 bvh_vertices[24]{};
 
 	ID3D11UnorderedAccessView* m_pRTTexture{};
 	//VIBuffer m_viBuffer{};

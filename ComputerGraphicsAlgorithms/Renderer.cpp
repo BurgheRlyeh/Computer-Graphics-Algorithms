@@ -132,6 +132,8 @@ bool Renderer::init(HWND hWnd) {
 		m_sceneBuffer.ambientColor = { 0.15f, 0.15f, 0.15f, 1.0f };
 	}
 
+	m_CPUTimer.start();
+
 	if (FAILED(hr)) {
 		term();
 	}
@@ -455,6 +457,23 @@ bool Renderer::render() {
 
 	m_pCube->readQueries();
 
+	++m_frameCounter;
+	double bvhTime{ m_pCube->m_pCPUTimer->getTime() };
+	m_bvhTime += bvhTime;
+	double cubeTime{ m_pCube->m_pGPUTimer->getTime() };
+	m_cubeTime += cubeTime;
+
+	double currTime{ m_CPUTimer.getCurrent() };
+	if (currTime > 1e3) {
+		m_fps = m_frameCounter / (currTime / 1e3);
+		m_bvhTimeAvg = m_bvhTime / m_frameCounter;
+		m_cubeTimeAvg = m_cubeTime / m_frameCounter;
+		m_bvhTime = 0;
+		m_cubeTime = 0;
+		m_frameCounter = 0;
+		m_CPUTimer.start();
+	}
+
 	// Start the Dear ImGui frame
 	ImGui_ImplDX11_NewFrame();
 	ImGui_ImplWin32_NewFrame();
@@ -463,11 +482,41 @@ bool Renderer::render() {
 	{
 		ImGui::Begin("Stats");
 
-		ImGui::Text("BVH construction time (ms): %.3f", m_pCube->m_pCPUTimer->getTime());
-		ImGui::Text("Cube render time (ms): %.3f", m_pCube->m_pGPUTimer->getTime());
+		ImGui::Text("FPS: %.1f", m_fps);
 
+		ImGui::Text("");
+
+		ImGui::Text("AVG BVH time (ms): %.3f", m_bvhTimeAvg);
+		ImGui::Text("AVG Cube time (ms): %.3f", m_cubeTimeAvg);
+
+		ImGui::Text("");
+		
 		ImGui::Text("Width: %d", m_width);
 		ImGui::Text("Height: %d", m_height);
+
+		ImGui::End();
+	}
+
+	{
+		ImGui::Begin("BVH");
+
+		ImGui::Text("Cubes: %d", m_pCube->bvh.cnt);
+		ImGui::Text("Nodes: %d", m_pCube->bvh.nodesUsed);
+		ImGui::Text("Primitives: %d", m_pCube->bvh.cnt * 12);
+		ImGui::Text("Leafs: %d", m_pCube->bvh.leafs);
+
+		ImGui::Text("");
+
+		ImGui::Text("Depth: %d ... %d", m_pCube->bvh.depthMin, m_pCube->bvh.depthMax);
+
+		//ImGui::Text("Min: %d", m_pCube->bvh.depthMin);
+		//ImGui::Text("Max: %d", m_pCube->bvh.depthMax);
+
+		ImGui::Text("");
+
+		ImGui::Text("Average prims per leaf: %.3f", 12.0 * m_pCube->bvh.cnt / m_pCube->bvh.leafs);
+		ImGui::Text("Prims per leaf: %d", m_pCube->bvh.trianglesPerLeaf);
+		ImGui::DragInt("ppl", &m_pCube->bvh.trianglesPerLeaf, 1, 1, 12);
 
 		ImGui::End();
 	}

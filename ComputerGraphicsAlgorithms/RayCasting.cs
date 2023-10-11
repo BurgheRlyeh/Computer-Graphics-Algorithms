@@ -310,21 +310,21 @@ void cs(uint3 DTid: SV_DispatchThreadID)
     Ray ray = generateRay(DTid.xy);
 
     //Intsec best = naiveIntersection(ray);
-    //Intsec best = bvhIntersection(ray);
-    Intsec best = bvhStacklessIntersection(ray);
+    Intsec best = bvhIntersection(ray);
+    //Intsec best = bvhStacklessIntersection(ray);
 
     if (best.t <= whnf.z || whnf.w <= best.t)
         return;
 
     // depth view
-    {
-        float depth = best.t * dot(ray.dir, camDir);
+    //{
+    //    float depth = best.t * dot(ray.dir, camDir);
 
-        float4 colorNear = float4(1.f, 1.f, 1.f, 1.f);
-        float4 colorFar = float4(0.f, 0.f, 0.f, 1.f);
+    //    float4 colorNear = float4(1.f, 1.f, 1.f, 1.f);
+    //    float4 colorFar = float4(0.f, 0.f, 0.f, 1.f);
 
-        float4 finalCl = lerp(colorNear, colorFar, 1.f - 1.f / depth);
-    }
+    //    float4 finalCl = lerp(colorNear, colorFar, 1.f - 1.f / depth);
+    //}
 
     Vertex v0 = vertices[indices[best.tId].x];
     Vertex v1 = vertices[indices[best.tId].y];
