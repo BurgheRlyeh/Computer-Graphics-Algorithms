@@ -197,7 +197,7 @@ HRESULT Renderer::createDeviceAndSwapChain(HWND hWnd, IDXGIAdapter* adapter) {
 	UINT flags{};
 #ifdef _DEBUG
 	flags |= D3D11_CREATE_DEVICE_DEBUG;
-#endif
+#endif // _DEBUG
 
 	DXGI_SWAP_CHAIN_DESC swapChainDesc{
 		.BufferDesc{
@@ -376,7 +376,7 @@ bool Renderer::update() {
 			static_cast<float>(nearPlane), static_cast<float>(farPlane),
 		};
 		(v * p).Invert(m_rtBuffer.pvInv);
-		m_rtBuffer.instances.x = m_pCube->getInstCount();
+		m_rtBuffer.instancesIntsecalg.x = m_pCube->getInstCount();
 
 		// update direction vector
 		Vector4 n = { 1.f / m_width, -1.f / m_height, 1.f / (nearPlane - farPlane), 1.f };
@@ -509,14 +509,32 @@ bool Renderer::render() {
 
 		ImGui::Text("Depth: %d ... %d", m_pCube->bvh.depthMin, m_pCube->bvh.depthMax);
 
-		//ImGui::Text("Min: %d", m_pCube->bvh.depthMin);
-		//ImGui::Text("Max: %d", m_pCube->bvh.depthMax);
-
 		ImGui::Text("");
 
 		ImGui::Text("Average prims per leaf: %.3f", 12.0 * m_pCube->bvh.cnt / m_pCube->bvh.leafs);
 		ImGui::Text("Prims per leaf: %d", m_pCube->bvh.trianglesPerLeaf);
 		ImGui::DragInt("ppl", &m_pCube->bvh.trianglesPerLeaf, 1, 1, 12);
+
+		ImGui::End();
+	}
+
+	{
+		ImGui::Begin("RT");
+
+		bool intsecStackless{ m_rtBuffer.instancesIntsecalg.y == 0 };
+		bool intsecStack{ m_rtBuffer.instancesIntsecalg.y == 1 };
+		bool intsecNaive{ m_rtBuffer.instancesIntsecalg.y == 2 };
+
+		ImGui::Checkbox("Stackless intersection", &intsecStackless);
+		ImGui::Checkbox("Stack intersection", &intsecStack);
+		ImGui::Checkbox("Naive intersection", &intsecNaive);
+
+		if (m_rtBuffer.instancesIntsecalg.y == 0)
+			m_rtBuffer.instancesIntsecalg.y = intsecStack ? 1 : (intsecNaive ? 2 : 0);
+		else if (m_rtBuffer.instancesIntsecalg.y == 1)
+			m_rtBuffer.instancesIntsecalg.y = intsecStackless ? 0 : (intsecNaive ? 2 : 1);
+		else
+			m_rtBuffer.instancesIntsecalg.y = intsecStackless ? 0 : (intsecStack ? 1 : 2);
 
 		ImGui::End();
 	}

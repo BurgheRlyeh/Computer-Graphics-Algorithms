@@ -25,7 +25,7 @@ cbuffer VIBuffer: register(b2) {
 cbuffer RTBuffer: register(b3) {
     float4 whnf;
     float4x4 vpInv;
-    float4 instances;
+    int4 instancesIntsecalg;
     float4 camDir;
 }
 
@@ -131,7 +131,7 @@ Intsec naiveIntersection(Ray ray) {
     best.t = whnf.w;
     best.u = best.v = -1.f;
 
-    for (int m = 0; m < instances.x; ++m)
+    for (int m = 0; m < instancesIntsecalg.x; ++m)
     {
         Ray mRay;
         mRay.orig = mul(modelBufferInv[m], ray.orig);
@@ -309,8 +309,16 @@ void cs(uint3 DTid: SV_DispatchThreadID)
 {
     Ray ray = generateRay(DTid.xy);
 
+    Intsec best;
+    if (instancesIntsecalg.y == 0)
+        best = bvhStacklessIntersection(ray);
+    else if (instancesIntsecalg.y == 1)
+        best = bvhIntersection(ray);
+    else //if (instancesIntsecalg.y == 2)
+        best = naiveIntersection(ray);
+
     //Intsec best = naiveIntersection(ray);
-    Intsec best = bvhIntersection(ray);
+    //Intsec best = bvhIntersection(ray);
     //Intsec best = bvhStacklessIntersection(ray);
 
     if (best.t <= whnf.z || whnf.w <= best.t)
@@ -341,6 +349,7 @@ void cs(uint3 DTid: SV_DispatchThreadID)
 
     texOutput[DTid.xy] = color;
 
+    
     //uint idx = best.mId;
     //uint flags = asuint(modelBuffer[idx].shineSpeedTexIdNM.w);
 

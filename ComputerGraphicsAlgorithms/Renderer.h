@@ -52,7 +52,7 @@ class Renderer {
 	struct RTBuffer {
 		DirectX::SimpleMath::Vector4 whnf{};
 		DirectX::SimpleMath::Matrix pvInv{};
-		DirectX::SimpleMath::Vector4 instances{ 2 };
+		DirectX::XMINT4 instancesIntsecalg{ 2, 0, 0, 0 };
 		DirectX::SimpleMath::Vector4 camDir{};
 	};
 	RTBuffer m_rtBuffer{};
@@ -142,7 +142,7 @@ class Renderer {
 	bool m_isShowNormals{};
 	bool m_isUseAmbient{ true };
 	bool m_useSepia{};
-	bool m_isShowCubemap{  };
+	bool m_isShowCubemap{ true };
 
 	DirectX::SimpleMath::Matrix m_v{};
 	DirectX::SimpleMath::Matrix m_p{};
