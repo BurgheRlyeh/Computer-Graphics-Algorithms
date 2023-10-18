@@ -376,7 +376,7 @@ bool Renderer::update() {
 			static_cast<float>(nearPlane), static_cast<float>(farPlane),
 		};
 		(v * p).Invert(m_rtBuffer.pvInv);
-		m_rtBuffer.instancesIntsecalg.x = m_pCube->getInstCount();
+		m_rtBuffer.instancesIntsecalgLeafsTCheck.x = m_pCube->getInstCount();
 
 		// update direction vector
 		Vector4 n = { 1.f / m_width, -1.f / m_height, 1.f / (nearPlane - farPlane), 1.f };
@@ -500,6 +500,18 @@ bool Renderer::render() {
 	{
 		ImGui::Begin("BVH");
 
+		ImGui::Text("Split alg:");
+
+		bool sah{ m_pCube->bvh.sah };
+		ImGui::Checkbox("SAH", &sah);
+		if (m_pCube->bvh.sah != sah) {
+			m_pCube->bvh.sah = sah;
+			m_pCube->updateBVH();
+		}
+
+		ImGui::Text(" ");
+		ImGui::Text("Stats:");
+
 		ImGui::Text("Cubes: %d", m_pCube->bvh.cnt);
 		ImGui::Text("Nodes: %d", m_pCube->bvh.nodesUsed);
 		ImGui::Text("Primitives: %d", m_pCube->bvh.cnt * 12);
@@ -521,20 +533,32 @@ bool Renderer::render() {
 	{
 		ImGui::Begin("RT");
 
-		bool intsecStackless{ m_rtBuffer.instancesIntsecalg.y == 0 };
-		bool intsecStack{ m_rtBuffer.instancesIntsecalg.y == 1 };
-		bool intsecNaive{ m_rtBuffer.instancesIntsecalg.y == 2 };
+		bool intsecStackless{ m_rtBuffer.instancesIntsecalgLeafsTCheck.y == 0 };
+		bool intsecStack{ m_rtBuffer.instancesIntsecalgLeafsTCheck.y == 1 };
+		bool intsecNaive{ m_rtBuffer.instancesIntsecalgLeafsTCheck.y == 2 };
 
 		ImGui::Checkbox("Stackless intersection", &intsecStackless);
 		ImGui::Checkbox("Stack intersection", &intsecStack);
 		ImGui::Checkbox("Naive intersection", &intsecNaive);
 
-		if (m_rtBuffer.instancesIntsecalg.y == 0)
-			m_rtBuffer.instancesIntsecalg.y = intsecStack ? 1 : (intsecNaive ? 2 : 0);
-		else if (m_rtBuffer.instancesIntsecalg.y == 1)
-			m_rtBuffer.instancesIntsecalg.y = intsecStackless ? 0 : (intsecNaive ? 2 : 1);
+		if (m_rtBuffer.instancesIntsecalgLeafsTCheck.y == 0)
+			m_rtBuffer.instancesIntsecalgLeafsTCheck.y = intsecStack ? 1 : (intsecNaive ? 2 : 0);
+		else if (m_rtBuffer.instancesIntsecalgLeafsTCheck.y == 1)
+			m_rtBuffer.instancesIntsecalgLeafsTCheck.y = intsecStackless ? 0 : (intsecNaive ? 2 : 1);
 		else
-			m_rtBuffer.instancesIntsecalg.y = intsecStackless ? 0 : (intsecStack ? 1 : 2);
+			m_rtBuffer.instancesIntsecalgLeafsTCheck.y = intsecStackless ? 0 : (intsecStack ? 1 : 2);
+
+		ImGui::Text(" ");
+
+		ImGui::Text("Stackless settings:");
+
+		bool notProcLeafs{ m_rtBuffer.instancesIntsecalgLeafsTCheck.z == 1 };
+		ImGui::Checkbox("Not process leafs", &notProcLeafs);
+		m_rtBuffer.instancesIntsecalgLeafsTCheck.z = notProcLeafs ? 1 : 0;
+
+		bool checkT{ m_rtBuffer.instancesIntsecalgLeafsTCheck.w == 1 };
+		ImGui::Checkbox("Check T", &checkT);
+		m_rtBuffer.instancesIntsecalgLeafsTCheck.w = checkT ? 1 : 0;
 
 		ImGui::End();
 	}

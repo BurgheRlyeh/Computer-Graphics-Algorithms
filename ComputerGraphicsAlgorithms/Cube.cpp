@@ -478,13 +478,19 @@ void Cube::update(float delta, bool isRotate) {
 		bvh_matrices[i] = m_modelBuffers[i].matrix;
 	}
 
+	m_pDeviceContext->UpdateSubresource(m_pModelBufferInst, 0, nullptr, m_modelBuffers.data(), 0, 0);
+	m_pDeviceContext->UpdateSubresource(m_pModelBufferInv, 0, nullptr, m_modelBuffersInv.data(), 0, 0);
+
+	updateBVH();
+}
+
+void Cube::updateBVH() {
 	m_pCPUTimer->start();
 	bvh.upd(m_instCount, bvh_vertices, m_viBuffer.indices, bvh_matrices);
 	bvh.build();
 	m_pCPUTimer->stop();
 
-	m_pDeviceContext->UpdateSubresource(m_pModelBufferInst, 0, nullptr, m_modelBuffers.data(), 0, 0);
-	m_pDeviceContext->UpdateSubresource(m_pModelBufferInv, 0, nullptr, m_modelBuffersInv.data(), 0, 0);
+	m_pDeviceContext->UpdateSubresource(m_pBVHBuffer, 0, nullptr, &bvh.m_bvhCBuf, 0, 0);
 }
 
 void Cube::render(ID3D11SamplerState* pSampler, ID3D11Buffer* pSceneBuffer) {
@@ -560,8 +566,6 @@ void Cube::rayTracingUpdate(ID3D11Texture2D* tex) {
 }
 
 void Cube::rayTracing(ID3D11SamplerState* pSampler, ID3D11Buffer* m_pSBuf, ID3D11Buffer* m_pRTBuf, int w, int h) {
-	m_pDeviceContext->UpdateSubresource(m_pBVHBuffer, 0, nullptr, &bvh.m_bvhCBuf, 0, 0);
-	
 	ID3D11SamplerState* samplers[]{ pSampler };
 	m_pDeviceContext->CSSetSamplers(0, 1, samplers);
 

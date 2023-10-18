@@ -30,4 +30,18 @@ struct AABB {
             0
         };
     }
+
+    inline DirectX::SimpleMath::Vector4 extent() {
+        return bmax - bmin;
+    }
+
+    inline void grow(DirectX::SimpleMath::Vector4 point) {
+        bmin = DirectX::SimpleMath::Vector4::Min(bmin, point);
+        bmax = DirectX::SimpleMath::Vector4::Max(bmax, point);
+    }
+
+    inline float area() {
+        DirectX::SimpleMath::Vector4 e{ bmax - bmin };
+        return e.x * e.y + e.y * e.z + e.z * e.x;
+    }
 };

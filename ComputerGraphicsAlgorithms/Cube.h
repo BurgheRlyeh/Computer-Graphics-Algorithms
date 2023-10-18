@@ -182,6 +182,7 @@ public:
 	void term();
 
 	void update(float delta, bool isRotate);
+	void updateBVH();
 	void render(ID3D11SamplerState* sampler, ID3D11Buffer* SceneBuffer);
 
 	HRESULT initCull();

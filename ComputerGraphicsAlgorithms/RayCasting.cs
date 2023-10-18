@@ -25,7 +25,7 @@ cbuffer VIBuffer: register(b2) {
 cbuffer RTBuffer: register(b3) {
     float4 whnf;
     float4x4 vpInv;
-    int4 instancesIntsecalg;
+    int4 instancesIntsecalgLeafsTCheck;
     float4 camDir;
 }
 
@@ -131,7 +131,7 @@ Intsec naiveIntersection(Ray ray) {
     best.t = whnf.w;
     best.u = best.v = -1.f;
 
-    for (int m = 0; m < instancesIntsecalg.x; ++m)
+    for (int m = 0; m < instancesIntsecalgLeafsTCheck.x; ++m)
     {
         Ray mRay;
         mRay.orig = mul(modelBufferInv[m], ray.orig);
@@ -158,7 +158,7 @@ Intsec naiveIntersection(Ray ray) {
 }
 
 // bvh intersection part
-bool isRayIntersectsAABB(Ray ray, AABB aabb) {
+float rayIntersectsAABB(Ray ray, AABB aabb) {
     float4 v1 = (aabb.bmin - ray.orig) / ray.dir;
     float4 v2 = (aabb.bmax - ray.orig) / ray.dir;
 
@@ -168,7 +168,7 @@ bool isRayIntersectsAABB(Ray ray, AABB aabb) {
     float tmin = max(max(vmin.x, vmin.y), vmin.z);
     float tmax = min(min(vmax.x, vmax.y), vmax.z);
 
-    return whnf.z < tmax && tmin <= tmax && tmin < whnf.w;
+    return whnf.z < tmax && tmin <= tmax && tmin < whnf.w ? tmin : whnf.w;
 }
 
 Intsec bestBVHLeafIntersection(Ray ray, BVHNode node)
@@ -218,7 +218,7 @@ Intsec bvhIntersection(Ray ray)
     while (stackSize > 0) {
         BVHNode node = bvhNode[stack[--stackSize]];
 
-        if (!isRayIntersectsAABB(ray, node.aabb))
+        if (rayIntersectsAABB(ray, node.aabb) == whnf.w)
             continue;
 
         if (node.leftFirstCntParent.z == 0) {
@@ -241,12 +241,22 @@ int parent(int node) {
     return bvhNode[node].leftFirstCntParent.w;
 }
 
-int leftChild(int node) {
-    return bvhNode[node].leftFirstCntParent.x;
+int sibling(int node) {
+    int parent = bvhNode[node].leftFirstCntParent.w;
+    int left = bvhNode[parent].leftFirstCntParent.x;
+    int right = bvhNode[parent].leftFirstCntParent.x + 1;
+    return node != left ? left : right;
 }
 
-int sibling(int node) {
-    return bvhNode[parent(node)].leftFirstCntParent.x + 1;
+int nearChild(int node, Ray ray)
+{
+    int left = bvhNode[node].leftFirstCntParent.x;
+    float tLeft = rayIntersectsAABB(ray, bvhNode[left].aabb);
+    
+    int right = bvhNode[node].leftFirstCntParent.x + 1;
+    float tRight = rayIntersectsAABB(ray, bvhNode[right].aabb);
+    
+    return tLeft <= tRight ? left : right;
 }
 
 bool isLeaf(int node) {
@@ -259,42 +269,53 @@ Intsec bvhStacklessIntersection(Ray ray)
     best.mId = best.tId = -1;
     best.t = whnf.w;
     best.u = best.v = -1.f;
-
-    if (!isRayIntersectsAABB(ray, bvhNode[0].aabb))
+    
+    if (rayIntersectsAABB(ray, bvhNode[0].aabb) == whnf.w)
         return best;
 
-    for (int2 nodeState = int2(leftChild(0), 0); nodeState.x != 0;) {
+    for (int2 nodeState = int2(nearChild(0, ray), 0); nodeState.x != 0;) {
         // from parent
         if (nodeState.y == 0) {
-            if (!isRayIntersectsAABB(ray, bvhNode[nodeState.x].aabb))
+            float t = rayIntersectsAABB(ray, bvhNode[nodeState.x].aabb);
+            if (instancesIntsecalgLeafsTCheck.w == 1 && best.t < t)
                 nodeState = int2(sibling(nodeState.x), 1);
-            else if (!isLeaf(nodeState.x))
-                nodeState = int2(leftChild(nodeState.x), 0);
+            else if (t == whnf.w)
+                nodeState = int2(sibling(nodeState.x), 1);
             else {
-                Intsec intsec = bestBVHLeafIntersection(ray, bvhNode[nodeState.x]);
-                if (intsec.t < best.t)
-                    best = intsec;
-
-                nodeState = int2(sibling(nodeState.x), 1);
+                if (!isLeaf(nodeState.x))
+                    nodeState = int2(nearChild(nodeState.x, ray), 0);
+                else {
+                    if (instancesIntsecalgLeafsTCheck.z == 0) {
+                        Intsec intsec = bestBVHLeafIntersection(ray, bvhNode[nodeState.x]);
+                        if (intsec.t < best.t)
+                            best = intsec;
+                    }
+                    nodeState = int2(sibling(nodeState.x), 1);
+                }
             }
         }
         // from sibling
         else if (nodeState.y == 1) {
-            if (!isRayIntersectsAABB(ray, bvhNode[nodeState.x].aabb))
+            float t = rayIntersectsAABB(ray, bvhNode[nodeState.x].aabb);
+            if (instancesIntsecalgLeafsTCheck.w == 1 && best.t < t)
+                nodeState = int2(parent(nodeState.x), 2);
+            else if (t == whnf.w)
                 nodeState = int2(parent(nodeState.x), 2);
             else if (!isLeaf(nodeState.x))
-                nodeState = int2(leftChild(nodeState.x), 0);
+                nodeState = int2(nearChild(nodeState.x, ray), 0);
             else {
-                Intsec intsec = bestBVHLeafIntersection(ray, bvhNode[nodeState.x]);
-                if (intsec.t < best.t)
-                    best = intsec;
+                if (instancesIntsecalgLeafsTCheck.z == 0) {
+                    Intsec intsec = bestBVHLeafIntersection(ray, bvhNode[nodeState.x]);
+                    if (intsec.t < best.t)
+                        best = intsec;
+                }
 
                 nodeState = int2(parent(nodeState.x), 2);
             }
         }
         // from child
         else if (nodeState.y == 2) {
-            if (nodeState.x == leftChild(parent(nodeState.x)))
+            if (nodeState.x == nearChild(parent(nodeState.x), ray))
                 nodeState = int2(sibling(nodeState.x), 1);
             else
                 nodeState = int2(parent(nodeState.x), 2);
@@ -310,11 +331,11 @@ void cs(uint3 DTid: SV_DispatchThreadID)
     Ray ray = generateRay(DTid.xy);
 
     Intsec best;
-    if (instancesIntsecalg.y == 0)
+    if (instancesIntsecalgLeafsTCheck.y == 0)
         best = bvhStacklessIntersection(ray);
-    else if (instancesIntsecalg.y == 1)
+    else if (instancesIntsecalgLeafsTCheck.y == 1)
         best = bvhIntersection(ray);
-    else //if (instancesIntsecalg.y == 2)
+    else //if (instancesIntsecalgLeafsTCheck.y == 2)
         best = naiveIntersection(ray);
 
     //Intsec best = naiveIntersection(ray);

@@ -14,6 +14,7 @@ using namespace DirectX::SimpleMath;
 class BVH {
 	struct Tri {
 		Vector4 v0{}, v1{}, v2{};
+		Vector4 center{};
 	};
 
 	struct BVHNode {
@@ -32,8 +33,10 @@ public:
 	INT nodesUsed{ 1 };
 	INT leafs{};
 	INT trianglesPerLeaf{ 2 };
-	INT depthMin{ 599 };
+	INT depthMin{ 600 };
 	INT depthMax{ -1 };
+
+	bool sah{ true };
 
 	struct BVHConstBuf {
 		BVHNode bvhNode[2 * N - 1]{};
@@ -56,6 +59,8 @@ public:
 				tri[id].v0 = Vector4::Transform(vertices[trIds.x], modelMatrices[m]);
 				tri[id].v1 = Vector4::Transform(vertices[trIds.y], modelMatrices[m]);
 				tri[id].v2 = Vector4::Transform(vertices[trIds.z], modelMatrices[m]);
+
+				tri[id].center = (tri[id].v0 + tri[id].v1 + tri[id].v2) / 3.f;
 
 				m_bvhCBuf.triIdx[id] = { id, 0, 0, 0 };
 			}
@@ -80,13 +85,9 @@ private:
 		for (INT i{}; i < node.leftFirstCntParent.z; ++i) {
 			Tri& leafTri = tri[m_bvhCBuf.triIdx[first + i].x];
 
-			node.bb.bmin = Vector4::Min(node.bb.bmin, leafTri.v0);
-			node.bb.bmin = Vector4::Min(node.bb.bmin, leafTri.v1);
-			node.bb.bmin = Vector4::Min(node.bb.bmin, leafTri.v2);
-
-			node.bb.bmax = Vector4::Max(node.bb.bmax, leafTri.v0);
-			node.bb.bmax = Vector4::Max(node.bb.bmax, leafTri.v1);
-			node.bb.bmax = Vector4::Max(node.bb.bmax, leafTri.v2);
+			node.bb.grow(leafTri.v0);
+			node.bb.grow(leafTri.v1);
+			node.bb.grow(leafTri.v2);
 		}
 	}
 
@@ -109,33 +110,99 @@ private:
 		return d;
 	}
 
-	void Subdivide(INT nodeIdx) {
-		// terminate recursion
-		BVHNode& node{ m_bvhCBuf.bvhNode[nodeIdx] };
-		if (node.leftFirstCntParent.z <= trianglesPerLeaf) {
-			++leafs;
-			INT d = depth(nodeIdx);
-			if (d < depthMin) {
-				depthMin = d;
+	void updDepths(INT id) {
+		INT d = depth(id);
+		if (d < depthMin)
+			depthMin = d;
+		if (d > depthMax)
+			depthMax = d;
+	}
+
+	void splitDichotomy(BVHNode& node, int& axis, float& splitPos) {
+		Vector4 e{ node.bb.extent()};
+		axis = static_cast<int>(e.x < e.y);
+		axis += static_cast<int>(vecCompByIdx(e, axis) < e.z);
+		splitPos = vecCompByIdx(node.bb.bmin + e / 2.f, axis);
+	}
+
+	float EvaluateSAH(BVHNode& node, int axis, float pos) {
+		AABB leftBox{}, rightBox{};
+		int leftCnt{}, rightCnt{};
+		for (int i{}; i < node.leftFirstCntParent.z; ++i) {
+			Tri& t = tri[m_bvhCBuf.triIdx[node.leftFirstCntParent.y + i].x];
+			if (vecCompByIdx(t.center, axis) < pos) {
+				++leftCnt;
+				leftBox.grow(t.v0);
+				leftBox.grow(t.v1);
+				leftBox.grow(t.v2);
 			}
-			if (d > depthMax) {
-				depthMax = d;
+			else {
+				++rightCnt;
+				rightBox.grow(t.v0);
+				rightBox.grow(t.v1);
+				rightBox.grow(t.v2);
 			}
-			return;
+		}
+		float cost{ leftCnt * leftBox.area() + rightCnt * rightBox.area() };
+		return cost > 0 ? cost : 1e30f;
+	}
+
+	bool splitSAH(BVHNode& node, int& axis, float& splitPos) {
+		axis = -1;
+		splitPos = 0;
+
+		float bestCost{ 1e30f };
+		for (int a{}; a < 3; ++a) {
+			for (int i{}; i < node.leftFirstCntParent.z; ++i) {
+				Tri& t = tri[m_bvhCBuf.triIdx[node.leftFirstCntParent.y + i].x]; // x or y
+				Vector4 center{ t.center };
+				float candidatePos = vecCompByIdx(center, a);
+				float cost = EvaluateSAH(node, a, candidatePos);
+				if (cost < bestCost) {
+					axis = a;
+					splitPos = candidatePos;
+					bestCost = cost;
+				}
+			}
 		}
 
+		if (bestCost >= node.leftFirstCntParent.z * node.bb.area()) {
+			return false;
+		}
+		return true;
+	}
+
+	void Subdivide(INT nodeId) {
+		// terminate recursion
+		BVHNode& node{ m_bvhCBuf.bvhNode[nodeId] };
+
 		// determine split axis and position
-		Vector4 extent{ node.bb.bmax - node.bb.bmin };
-		int axis{ static_cast<int>(extent.x < extent.y) };
-		axis += static_cast<int>(vecCompByIdx(extent, axis) < extent.z);
-		float splitPos{ vecCompByIdx(node.bb.bmin + extent / 2.f, axis) };
-		
+		int axis{};
+		float splitPos{};
+
+		if (sah) {
+			if (!splitSAH(node, axis, splitPos)) {
+				++leafs;
+				updDepths(nodeId);
+				return;
+			}
+		}
+		else {
+			if (node.leftFirstCntParent.z <= trianglesPerLeaf) {
+				++leafs;
+				updDepths(nodeId);
+				return;
+			}
+			splitDichotomy(node, axis, splitPos);
+		}
+
 		// in-place partition
 		INT i{ node.leftFirstCntParent.y };
 		INT j{ i + node.leftFirstCntParent.z - 1 };
 		while (i <= j) {
 			Tri& t = tri[m_bvhCBuf.triIdx[i++].x];
-			Vector4 center = (t.v0 + t.v1 + t.v2) / 3.f;
+			//Vector4 center = (t.v0 + t.v1 + t.v2) / 3.f;
+			Vector4 center{ t.center };
 
 			if (splitPos <= vecCompByIdx(center, axis))
 				std::swap(m_bvhCBuf.triIdx[--i].x, m_bvhCBuf.triIdx[j--].x);
@@ -145,26 +212,20 @@ private:
 		INT leftCnt{ i - node.leftFirstCntParent.y };
 		if (leftCnt == 0 || leftCnt == node.leftFirstCntParent.z) {
 			++leafs;
-			INT d = depth(nodeIdx);
-			if (d < depthMin) {
-				depthMin = d;
-			}
-			if (d > depthMax) {
-				depthMax = d;
-			}
+			updDepths(nodeId);
 			return;
 		}
 
 		// create child nodes
 		int leftIdx{ nodesUsed++ };
 		m_bvhCBuf.bvhNode[leftIdx].leftFirstCntParent = {
-			-1, node.leftFirstCntParent.y, leftCnt, nodeIdx
+			-1, node.leftFirstCntParent.y, leftCnt, nodeId
 		};
 		updNodeBounds(leftIdx);
 
 		int rightIdx{ nodesUsed++ };
 		m_bvhCBuf.bvhNode[rightIdx].leftFirstCntParent = {
-			-1, i, node.leftFirstCntParent.z - leftCnt, nodeIdx
+			-1, i, node.leftFirstCntParent.z - leftCnt, nodeId
 		};
 		updNodeBounds(rightIdx);
 

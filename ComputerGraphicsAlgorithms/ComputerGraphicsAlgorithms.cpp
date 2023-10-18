@@ -36,7 +36,8 @@ int APIENTRY wWinMain(
 	UNREFERENCED_PARAMETER(lpCmdLine);
 
 	// TODO: Place code here.
-	srand(time(nullptr));
+	//srand(time(nullptr));
+	srand(123456);
 
 	// Initialize global strings
 	LoadStringW(hInstance, IDS_APP_TITLE, szTitle, MAX_LOADSTRING);
