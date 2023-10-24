@@ -52,7 +52,7 @@ class Renderer {
 	struct RTBuffer {
 		DirectX::SimpleMath::Vector4 whnf{};
 		DirectX::SimpleMath::Matrix pvInv{};
-		DirectX::XMINT4 instancesIntsecalgLeafsTCheck{ 2, 0, 0, 0 };
+		DirectX::XMINT4 instancesIntsecalgLeafsTCheck{ 2, 0, 0, 1 };
 		DirectX::SimpleMath::Vector4 camDir{};
 	};
 	RTBuffer m_rtBuffer{};

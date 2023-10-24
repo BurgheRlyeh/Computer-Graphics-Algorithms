@@ -58,6 +58,11 @@ void Renderer::KeyboardHandler::keyPressed(int keyCode) {
 	case 'a':
 		camera.dRight += panSpeed;
 		break;
+
+	case 'B':
+	case 'b':
+		renderer.m_pCube->updateBVH();
+		break;
 	}
 }
 
@@ -81,6 +86,11 @@ void Renderer::KeyboardHandler::keyReleased(int keyCode) {
 	case 'A':
 	case 'a':
 		renderer.m_camera.dRight -= panSpeed;
+		break;
+
+	case 'B':
+	case 'b':
+		renderer.m_pCube->updateBVH();
 		break;
 	}
 }
@@ -502,11 +512,29 @@ bool Renderer::render() {
 
 		ImGui::Text("Split alg:");
 
-		bool sah{ m_pCube->bvh.sah };
-		ImGui::Checkbox("SAH", &sah);
-		if (m_pCube->bvh.sah != sah) {
-			m_pCube->bvh.sah = sah;
+		bool isSAH{ m_pCube->bvh.isSAH };
+		ImGui::Checkbox("SAH", &isSAH);
+		if (m_pCube->bvh.isSAH != isSAH) {
+			m_pCube->bvh.isSAH = isSAH;
 			m_pCube->updateBVH();
+		}
+
+		if (isSAH) {
+			bool isStepSAH{ m_pCube->bvh.isStepSAH };
+			ImGui::Checkbox("SAH with planes step", &isStepSAH);
+			if (m_pCube->bvh.isStepSAH != isStepSAH) {
+				m_pCube->bvh.isStepSAH = isStepSAH;
+				m_pCube->updateBVH();
+			}
+
+			if (isStepSAH) {
+				bool isBinsSAH{ m_pCube->bvh.isBinsSAH };
+				ImGui::Checkbox("SAH with bins", &isBinsSAH);
+				if (m_pCube->bvh.isBinsSAH != isBinsSAH) {
+					m_pCube->bvh.isBinsSAH = isBinsSAH;
+					m_pCube->updateBVH();
+				}
+			}
 		}
 
 		ImGui::Text(" ");
@@ -516,16 +544,17 @@ bool Renderer::render() {
 		ImGui::Text("Nodes: %d", m_pCube->bvh.nodesUsed);
 		ImGui::Text("Primitives: %d", m_pCube->bvh.cnt * 12);
 		ImGui::Text("Leafs: %d", m_pCube->bvh.leafs);
-
-		ImGui::Text("");
-
+		ImGui::Text("Average prims per leaf: %.3f", 12.0 * m_pCube->bvh.cnt / m_pCube->bvh.leafs);
 		ImGui::Text("Depth: %d ... %d", m_pCube->bvh.depthMin, m_pCube->bvh.depthMax);
 
 		ImGui::Text("");
-
-		ImGui::Text("Average prims per leaf: %.3f", 12.0 * m_pCube->bvh.cnt / m_pCube->bvh.leafs);
-		ImGui::Text("Prims per leaf: %d", m_pCube->bvh.trianglesPerLeaf);
-		ImGui::DragInt("ppl", &m_pCube->bvh.trianglesPerLeaf, 1, 1, 12);
+		
+		if (m_pCube->bvh.isStepSAH) {
+			ImGui::DragInt("SAH planes", &m_pCube->bvh.sahStep, 1, 2, 25);
+		}
+		else if (!m_pCube->bvh.isSAH) {
+			ImGui::DragInt("ppl", &m_pCube->bvh.trianglesPerLeaf, 1, 1, 12);
+		}
 
 		ImGui::End();
 	}

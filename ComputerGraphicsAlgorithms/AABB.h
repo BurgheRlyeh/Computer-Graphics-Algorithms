@@ -40,6 +40,13 @@ struct AABB {
         bmax = DirectX::SimpleMath::Vector4::Max(bmax, point);
     }
 
+    inline void grow(AABB& aabb) {
+        if (aabb.bmin.x != std::numeric_limits<float>::max()) {
+            grow(aabb.bmin);
+            grow(aabb.bmax);
+        }
+    }
+
     inline float area() {
         DirectX::SimpleMath::Vector4 e{ bmax - bmin };
         return e.x * e.y + e.y * e.z + e.z * e.x;

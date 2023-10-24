@@ -11,6 +11,9 @@ struct AABB;
 using namespace DirectX;
 using namespace DirectX::SimpleMath;
 
+#undef min
+#undef max
+
 class BVH {
 	struct Tri {
 		Vector4 v0{}, v1{}, v2{};
@@ -32,11 +35,17 @@ public:
 	INT cnt{};
 	INT nodesUsed{ 1 };
 	INT leafs{};
-	INT trianglesPerLeaf{ 2 };
 	INT depthMin{ 600 };
 	INT depthMax{ -1 };
 
-	bool sah{ true };
+	// dichotomy settings
+	INT trianglesPerLeaf{ 2 };
+
+	// sah settings
+	bool isSAH{ true };
+	bool isStepSAH{ true };
+	bool isBinsSAH{ true };	// true / false
+	INT sahStep{ 8 };
 
 	struct BVHConstBuf {
 		BVHNode bvhNode[2 * N - 1]{};
@@ -125,11 +134,12 @@ private:
 		splitPos = vecCompByIdx(node.bb.bmin + e / 2.f, axis);
 	}
 
-	float EvaluateSAH(BVHNode& node, int axis, float pos) {
+	float evaluateSAH(BVHNode& node, int axis, float pos) {
 		AABB leftBox{}, rightBox{};
 		int leftCnt{}, rightCnt{};
 		for (int i{}; i < node.leftFirstCntParent.z; ++i) {
 			Tri& t = tri[m_bvhCBuf.triIdx[node.leftFirstCntParent.y + i].x];
+
 			if (vecCompByIdx(t.center, axis) < pos) {
 				++leftCnt;
 				leftBox.grow(t.v0);
@@ -144,20 +154,41 @@ private:
 			}
 		}
 		float cost{ leftCnt * leftBox.area() + rightCnt * rightBox.area() };
-		return cost > 0 ? cost : 1e30f;
+		return cost > 0 ? cost : std::numeric_limits<float>::max();
 	}
 
-	bool splitSAH(BVHNode& node, int& axis, float& splitPos) {
-		axis = -1;
-		splitPos = 0;
-
-		float bestCost{ 1e30f };
+	float splitSAH(BVHNode& node, int& axis, float& splitPos) {
+		float bestCost{ std::numeric_limits<float>::max() };
 		for (int a{}; a < 3; ++a) {
 			for (int i{}; i < node.leftFirstCntParent.z; ++i) {
-				Tri& t = tri[m_bvhCBuf.triIdx[node.leftFirstCntParent.y + i].x]; // x or y
+				Tri& t = tri[m_bvhCBuf.triIdx[node.leftFirstCntParent.y + i].x];
 				Vector4 center{ t.center };
-				float candidatePos = vecCompByIdx(center, a);
-				float cost = EvaluateSAH(node, a, candidatePos);
+				float pos = vecCompByIdx(center, a);
+				float cost = evaluateSAH(node, a, pos);
+				if (cost < bestCost) {
+					axis = a;
+					splitPos = pos;
+					bestCost = cost;
+				}
+			}
+		}
+
+		return bestCost;
+	}
+
+	float splitByStepSAH(BVHNode& node, int& axis, float& splitPos) {
+		float bestCost{ std::numeric_limits<float>::max() };
+		for (int a{}; a < 3; ++a) {
+			float bmin = vecCompByIdx(node.bb.bmin, a);
+			float bmax = vecCompByIdx(node.bb.bmax, a);
+
+			if (bmin == bmax)
+				continue;
+
+			float scale = (bmax - bmin) / sahStep;
+			for (int i{ 1 }; i < sahStep; ++i) {
+				float candidatePos{ bmin + i * scale };
+				float cost = evaluateSAH(node, a, candidatePos);
 				if (cost < bestCost) {
 					axis = a;
 					splitPos = candidatePos;
@@ -166,11 +197,118 @@ private:
 			}
 		}
 
-		if (bestCost >= node.leftFirstCntParent.z * node.bb.area()) {
-			return false;
-		}
-		return true;
+		return bestCost;
 	}
+
+	struct Bin {
+		AABB bounds{};
+		int triCnt{};
+	};
+
+	float splitByStepSAHWithBins(BVHNode& node, int& axis, float& splitPos) {
+		float bestCost{ std::numeric_limits<float>::max() };
+		for (int a{}; a < 3; ++a) {
+			float boundsMin{ std::numeric_limits<float>::max() },
+				boundsMax{ std::numeric_limits<float>::min() };
+			for (int i{}; i < node.leftFirstCntParent.z; ++i) {
+				Tri& t = tri[m_bvhCBuf.triIdx[node.leftFirstCntParent.y + i].x];
+				boundsMin = min(boundsMin, vecCompByIdx(t.center, a));
+				boundsMax = max(boundsMax, vecCompByIdx(t.center, a));
+			}
+			if (boundsMin == boundsMax)
+				continue;
+			Bin bin[8]{};
+			float scale = sahStep / (boundsMax - boundsMin);
+			for (int i{}; i < node.leftFirstCntParent.z; ++i) {
+				Tri& t = tri[m_bvhCBuf.triIdx[node.leftFirstCntParent.y + i].x];
+				int binIdx = min(sahStep - 1, (int)((vecCompByIdx(t.center, a) - boundsMin) * scale));
+				bin[binIdx].triCnt++;
+				bin[binIdx].bounds.grow(t.v0);
+				bin[binIdx].bounds.grow(t.v1);
+				bin[binIdx].bounds.grow(t.v2);
+			}
+			float leftArea[7], rightArea[7];
+			int leftCnt[7], rightCnt[7];
+			AABB leftBox{}, rightBox{};
+			int leftSum{}, rightSum{};
+			for (int i{}; i < sahStep - 1; ++i) {
+				leftSum += bin[i].triCnt;
+				leftCnt[i] = leftSum;
+				leftBox.grow(bin[i].bounds);
+				leftArea[i] = leftBox.area();
+
+				rightSum += bin[sahStep - 1 - i].triCnt;
+				rightCnt[sahStep - 2 - i] = rightSum;
+				rightBox.grow(bin[sahStep - 1 - i].bounds);
+				rightArea[sahStep - 2 - i] = rightBox.area();
+			}
+			scale = (boundsMax - boundsMin) / sahStep;
+			for (int i{}; i < sahStep - 1; ++i) {
+				float planeCost{ leftCnt[i] * leftArea[i] + rightCnt[i] * rightArea[i] };
+				if (planeCost < bestCost) {
+					axis = a;
+					splitPos = boundsMin + scale * (i + 1);
+					bestCost = planeCost;
+				}
+			}
+		}
+		return bestCost;
+	}
+
+	//float splitByStepSAHWithBins(BVHNode& node, int& axis, float& splitPos) {
+	//	float bestCost{ std::numeric_limits<float>::max() };
+	//	for (int a{}; a < 3; ++a) {
+	//		//float bmin = vecCompByIdx(node.bb.bmin, a);
+	//		//float bmax = vecCompByIdx(node.bb.bmax, a);
+
+	//		float boundsMin = std::numeric_limits<float>::max(), boundsMax = std::numeric_limits<float>::min();
+	//		for (int i{}; i < node.leftFirstCntParent.z; ++i) {
+	//			Tri& t = tri[m_bvhCBuf.triIdx[node.leftFirstCntParent.y + i].x];
+	//			boundsMin = min(boundsMin, vecCompByIdx(t.center, a));
+	//			boundsMax = max(boundsMax, vecCompByIdx(t.center, a));
+	//		}
+
+	//		if (boundsMin == boundsMax)
+	//			continue;
+
+	//		float scale = sahStep / (boundsMax - boundsMin);
+	//		for (int i{}; i < node.leftFirstCntParent.z; ++i) {
+	//			Tri& t = tri[m_bvhCBuf.triIdx[node.leftFirstCntParent.y + i].x];
+	//			int binId = min(sahStep - 1, (int)((vecCompByIdx(t.center, a) - boundsMin) * scale));
+
+	//			bins[binId].triCnt++;
+	//			bins[binId].bb.grow(t.v0);
+	//			bins[binId].bb.grow(t.v1);
+	//			bins[binId].bb.grow(t.v2);
+	//		}
+
+	//		AABB leftBox{}, rightBox{};
+	//		int leftSum{}, rightSum{};
+	//		for (int i{}; i < sahStep - 1; ++i) {
+	//			leftSum += bins[i].triCnt;
+	//			lc[i] = leftSum;
+	//			leftBox.grow(bins[i].bb);
+	//			la[i] = leftBox.area();
+
+	//			rightSum += bins[sahStep - 1 - i].triCnt;
+	//			rc[sahStep - 2 - i] = rightSum;
+	//			rightBox.grow(bins[sahStep - 1 - i].bb);
+	//			ra[sahStep - 2 - i] = rightBox.area();
+	//		}
+
+	//		scale = (boundsMax - boundsMin) / sahStep;
+	//		for (int i{}; i < sahStep - 1; ++i) {
+	//			float cost = lc[i] * la[i] + rc[i] * ra[i];
+	//			if (cost < bestCost) {
+	//				axis = a;
+	//				splitPos = boundsMin + scale * (i + 1);
+	//				bestCost = cost;
+	//			}
+	//		}
+	//	}
+
+	//	return bestCost;
+	//}
 
 	void Subdivide(INT nodeId) {
 		// terminate recursion
@@ -180,8 +318,19 @@ private:
 		int axis{};
 		float splitPos{};
 
-		if (sah) {
-			if (!splitSAH(node, axis, splitPos)) {
+		if (isSAH) {
+			float cost;
+
+			if (isStepSAH) {
+				cost = isBinsSAH ? splitByStepSAHWithBins(node, axis, splitPos) : splitByStepSAH(node, axis, splitPos);
+			}
+			else {
+				cost = splitSAH(node, axis, splitPos);
+			}
+
+			//float cost = isStepSAH ? splitByStepSAH(node, axis, splitPos) : splitSAH(node, axis, splitPos);
+			
+			if (cost >= node.bb.area() * node.leftFirstCntParent.z) {
 				++leafs;
 				updDepths(nodeId);
 				return;
