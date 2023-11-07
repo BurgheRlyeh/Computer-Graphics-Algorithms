@@ -516,23 +516,23 @@ bool Renderer::render() {
 		ImGui::Checkbox("SAH", &isSAH);
 		if (m_pCube->bvh.isSAH != isSAH) {
 			m_pCube->bvh.isSAH = isSAH;
-			m_pCube->updateBVH();
+			m_pCube->updateBVH(true);
 		}
 
 		if (isSAH) {
 			bool isStepSAH{ m_pCube->bvh.isStepSAH };
-			ImGui::Checkbox("SAH with planes step", &isStepSAH);
+			ImGui::Checkbox("SAH, fixed planes", &isStepSAH);
 			if (m_pCube->bvh.isStepSAH != isStepSAH) {
 				m_pCube->bvh.isStepSAH = isStepSAH;
-				m_pCube->updateBVH();
+				m_pCube->updateBVH(true);
 			}
 
 			if (isStepSAH) {
 				bool isBinsSAH{ m_pCube->bvh.isBinsSAH };
-				ImGui::Checkbox("SAH with bins", &isBinsSAH);
+				ImGui::Checkbox("dynamic SAH, fixed planes", &isBinsSAH);
 				if (m_pCube->bvh.isBinsSAH != isBinsSAH) {
 					m_pCube->bvh.isBinsSAH = isBinsSAH;
-					m_pCube->updateBVH();
+					m_pCube->updateBVH(true);
 				}
 			}
 		}

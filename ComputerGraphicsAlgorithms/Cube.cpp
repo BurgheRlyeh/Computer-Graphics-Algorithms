@@ -484,10 +484,18 @@ void Cube::update(float delta, bool isRotate) {
 	updateBVH();
 }
 
-void Cube::updateBVH() {
+void Cube::updateBVH(bool rebuild) {
 	m_pCPUTimer->start();
-	bvh.upd(m_instCount, bvh_vertices, m_viBuffer.indices, bvh_matrices);
-	bvh.build();
+	
+	if (m_isRebuildBVH || rebuild) {
+		bvh.init(m_instCount, bvh_vertices, m_viBuffer.indices, bvh_matrices);
+		bvh.build();
+		m_isRebuildBVH = false;
+	}
+	else {
+		bvh.update(m_instCount, bvh_vertices, m_viBuffer.indices, bvh_matrices);
+	}
+	
 	m_pCPUTimer->stop();
 
 	m_pDeviceContext->UpdateSubresource(m_pBVHBuffer, 0, nullptr, &bvh.m_bvhCBuf, 0, 0);
@@ -887,6 +895,7 @@ void Cube::initImGUI() {
 		Vector4 pos{ m_modelBuffers[m_instCount].posAndAng };
 		if (!pos.x && !pos.y && !pos.z) {
 			initModel(m_modelBuffers[m_instCount], m_modelBBs[m_instCount]);
+			m_isRebuildBVH = true;
 		}
 		//m_modelBuffers[m_instCount].matrix.Invert(m_modelBuffersInv[m_instCount].modelMatrixInv);
 		++m_instCount;

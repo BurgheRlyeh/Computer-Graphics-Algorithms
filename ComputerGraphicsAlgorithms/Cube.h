@@ -150,6 +150,7 @@ private:
 	ID3D11Buffer* m_pVIBuffer{};
 	ID3D11ComputeShader* m_pRTShader{};
 	bool m_isRayTracing{ true };
+	bool m_isRebuildBVH{ true };
 
 	ID3D11Query* m_queries[10]{};
 	UINT64 m_curFrame{};
@@ -182,7 +183,7 @@ public:
 	void term();
 
 	void update(float delta, bool isRotate);
-	void updateBVH();
+	void updateBVH(bool rebuild = false);
 	void render(ID3D11SamplerState* sampler, ID3D11Buffer* SceneBuffer);
 
 	HRESULT initCull();
