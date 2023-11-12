@@ -96,10 +96,19 @@
     <ClInclude Include="PostProcess.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="BVH.h">
+    <ClInclude Include="CubeBVH.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Timer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Geometry.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="BVH.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="CSVGeometryLoader.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -155,6 +164,9 @@
     <ClCompile Include="PostProcess.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Geometry.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="ComputerGraphicsAlgorithms.rc">
@@ -201,6 +213,9 @@
       <Filter>Shaders</Filter>
     </None>
     <None Include="RayCasting.cs">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="RayTracing.cs">
       <Filter>Shaders</Filter>
     </None>
   </ItemGroup>

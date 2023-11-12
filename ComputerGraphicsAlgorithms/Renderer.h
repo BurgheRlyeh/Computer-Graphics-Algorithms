@@ -17,6 +17,8 @@
 #include "AABB.h"
 #include "PostProcess.h"
 #include "Timer.h"
+#include "CubeBVH.h"
+#include "Geometry.h"
 #include "BVH.h"
 
 #include "SimpleMath.h"
@@ -36,6 +38,8 @@ struct AABB;
 struct PostProcess;
 class CPUTimer;
 class GPUTimer;
+class CubeBVH;
+class Geometry;
 class BVH;
 
 class Renderer {
@@ -106,6 +110,7 @@ class Renderer {
 	PostProcess* m_pPostProcess{};
 
 	Cube* m_pCube{};
+	Geometry* m_pGeom{};
 	float m_cubeAngleRotation{};
 
 	Sphere* m_pSphere{};
@@ -131,7 +136,7 @@ class Renderer {
 	UINT m_width{ 16 };
 	UINT m_height{ 16 };
 
-	bool m_isModelRotate{ true };
+	bool m_isModelRotate{ false };
 
 	size_t m_prevTime{};
 

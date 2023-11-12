@@ -62,6 +62,7 @@ void Renderer::KeyboardHandler::keyPressed(int keyCode) {
 	case 'B':
 	case 'b':
 		renderer.m_pCube->updateBVH();
+		renderer.m_pGeom->updateBVH();
 		break;
 	}
 }
@@ -91,6 +92,7 @@ void Renderer::KeyboardHandler::keyReleased(int keyCode) {
 	case 'B':
 	case 'b':
 		renderer.m_pCube->updateBVH();
+		renderer.m_pGeom->updateBVH();
 		break;
 	}
 }
@@ -284,6 +286,7 @@ bool Renderer::resize(UINT width, UINT height) {
 
 	// rt update
 	m_pCube->rayTracingUpdate(m_pPostProcess->getTexture());
+	m_pGeom->resizeUAV(m_pPostProcess->getTexture());
 	
 	D3D11_MAPPED_SUBRESOURCE subres;
 	hr = m_pDeviceContext->Map(
@@ -315,6 +318,8 @@ bool Renderer::update() {
 	m_camera.move((time - m_prevTime) / 1e6f);
 
 	m_pCube->update((time - m_prevTime) / 1e6f, m_isModelRotate);
+	//m_pGeom->update((time - m_prevTime) / 1e6f, m_isModelRotate);
+	m_pGeom->updateBVH(true);
 
 	// Move light bulb spheres
 	m_pLightSphere->update(m_sceneBuffer.lights, m_sceneBuffer.lightsBumpNormsCull.x);
@@ -376,7 +381,7 @@ bool Renderer::update() {
 	// update culling parameters
 	m_pCube->updateCullParams();
 
-	// ray tracing buffer update
+	// cube ray tracing buffer update
 	{
 		hr = m_pDeviceContext->Map(m_pRTBuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &subres);
 		THROW_IF_FAILED(hr);
@@ -448,6 +453,8 @@ bool Renderer::render() {
 		m_pCube->cullBoxes(m_pSceneBuffer, m_camera, static_cast<float>(m_height) / m_width);
 		m_pCube->render(m_pSampler, m_pSceneBuffer);
 	}
+
+	m_pGeom->rayTracing(m_pSceneBuffer, m_pRTBuffer, m_width, m_height);
 	
 	// CUBE END
 
@@ -468,7 +475,7 @@ bool Renderer::render() {
 	m_pCube->readQueries();
 
 	++m_frameCounter;
-	double bvhTime{ m_pCube->m_pCPUTimer->getTime() };
+	double bvhTime{ m_pGeom->m_pCPUTimer->getTime() };
 	m_bvhTime += bvhTime;
 	double cubeTime{ m_pCube->m_pGPUTimer->getTime() };
 	m_cubeTime += cubeTime;
@@ -496,7 +503,7 @@ bool Renderer::render() {
 
 		ImGui::Text("");
 
-		ImGui::Text("AVG BVH time (ms): %.3f", m_bvhTimeAvg);
+		ImGui::Text("AVG CubeBVH time (ms): %.3f", m_bvhTimeAvg);
 		ImGui::Text("AVG Cube time (ms): %.3f", m_cubeTimeAvg);
 
 		ImGui::Text("");
@@ -508,7 +515,7 @@ bool Renderer::render() {
 	}
 
 	{
-		ImGui::Begin("BVH");
+		ImGui::Begin("CubeBVH");
 
 		ImGui::Text("Split alg:");
 
@@ -554,6 +561,58 @@ bool Renderer::render() {
 		}
 		else if (!m_pCube->bvh.isSAH) {
 			ImGui::DragInt("ppl", &m_pCube->bvh.trianglesPerLeaf, 1, 1, 12);
+		}
+
+		ImGui::End();
+	}
+
+	{
+		ImGui::Begin("GeomBVH");
+
+		ImGui::Text("Split alg:");
+
+		bool isSAH{ m_pGeom->bvh.isSAH };
+		ImGui::Checkbox("SAH", &isSAH);
+		if (m_pGeom->bvh.isSAH != isSAH) {
+			m_pGeom->bvh.isSAH = isSAH;
+			m_pGeom->updateBVH(true);
+		}
+
+		if (isSAH) {
+			bool isStepSAH{ m_pGeom->bvh.isStepSAH };
+			ImGui::Checkbox("SAH, fixed planes", &isStepSAH);
+			if (m_pGeom->bvh.isStepSAH != isStepSAH) {
+				m_pGeom->bvh.isStepSAH = isStepSAH;
+				m_pGeom->updateBVH(true);
+			}
+
+			if (isStepSAH) {
+				bool isBinsSAH{ m_pGeom->bvh.isBinsSAH };
+				ImGui::Checkbox("dynamic SAH, fixed planes", &isBinsSAH);
+				if (m_pGeom->bvh.isBinsSAH != isBinsSAH) {
+					m_pGeom->bvh.isBinsSAH = isBinsSAH;
+					m_pGeom->updateBVH(true);
+				}
+			}
+		}
+
+		ImGui::Text(" ");
+		ImGui::Text("Stats:");
+
+		ImGui::Text("Geoms: %d", m_pGeom->bvh.cnt);
+		ImGui::Text("Nodes: %d", m_pGeom->bvh.nodesUsed);
+		ImGui::Text("Primitives: %d", m_pGeom->bvh.cnt * 1107);
+		ImGui::Text("Leafs: %d", m_pGeom->bvh.leafs);
+		ImGui::Text("Average prims per leaf: %.3f", 1107.0 / m_pGeom->bvh.leafs);
+		ImGui::Text("Depth: %d ... %d", m_pGeom->bvh.depthMin, m_pGeom->bvh.depthMax);
+
+		ImGui::Text("");
+
+		if (m_pGeom->bvh.isStepSAH) {
+			ImGui::DragInt("SAH planes", &m_pGeom->bvh.sahStep, 1, 2, 32);
+		}
+		else if (!m_pGeom->bvh.isSAH) {
+			ImGui::DragInt("ppl", &m_pGeom->bvh.trianglesPerLeaf, 1, 1, 12);
 		}
 
 		ImGui::End();
@@ -705,6 +764,9 @@ HRESULT Renderer::initScene() {
 	hr = m_pCube->init(positions, 2);
 	THROW_IF_FAILED(hr);
 
+	m_pGeom = new Geometry(m_pDevice, m_pDeviceContext);
+	m_pGeom->init(m_pPostProcess->getTexture());
+
 	// create scene buffer
 	{
 		hr = createSceneBuffer();
@@ -848,6 +910,7 @@ void Renderer::termScene() {
 	SAFE_RELEASE(m_pDepthBufferDSV);
 
 	m_pCube->term();
+	m_pGeom->term();
 	m_pSphere->term();
 }
 

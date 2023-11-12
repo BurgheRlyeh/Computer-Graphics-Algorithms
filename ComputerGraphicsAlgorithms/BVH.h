@@ -2,10 +2,8 @@
 
 #include "framework.h"
 
-#include "Cube.h"
 #include "AABB.h"
 
-class Cube;
 struct AABB;
 
 using namespace DirectX;
@@ -14,7 +12,10 @@ using namespace DirectX::SimpleMath;
 #undef min
 #undef max
 
-#define MaxSteps 25
+#define MaxSteps 32
+
+#define LIMIT_V 1013
+#define LIMIT_I 1107
 
 class BVH {
 	struct Tri {
@@ -22,22 +23,22 @@ class BVH {
 		Vector4 center{};
 	};
 
-	struct BVHNode {
+	/*struct BVHNode {
 		AABB bb{};
 		XMINT4 leftFirstCntParent;
-	};
+	};*/
 
-	static const INT N{ 300 };
+	static const INT N{ LIMIT_I };
 
 	Tri tri[N]{};
-	
+
 	INT rootNodeIdx{};
 
 public:
 	INT cnt{};
 	INT nodesUsed{ 1 };
 	INT leafs{};
-	INT depthMin{ 600 };
+	INT depthMin{ 2 * N };
 	INT depthMax{ -1 };
 
 	// dichotomy settings
@@ -47,67 +48,73 @@ public:
 	bool isSAH{ true };
 	bool isStepSAH{ true };
 	bool isBinsSAH{ true };	// true / false
-	INT sahStep{ 8 };
+	INT sahStep{ 3 };
 
-	struct BVHConstBuf {
-		BVHNode bvhNode[2 * N - 1]{};
-		XMINT4 triIdx[N]{};
-	} m_bvhCBuf;
+	//struct BVHConstBuf {
+	//	BVHNode bvhNode[2 * N - 1]{};
+	//} m_bvhCBuf;
+	AABB bbs[2 * N - 1 - 165]{};
+	XMINT4 lfcps[2 * N - 1]{};	// leftFirstCntParent
+	XMINT4 triIdx[N]{};
 
-	void init(INT instCnt, Vector4(&vertices)[24], XMINT4(&indices)[12], Matrix(&modelMatrices)[25]) {
+	void init(INT instCnt, Vector4(&vertices)[LIMIT_V], XMINT4(&indices)[LIMIT_I], Matrix modelMatrices) {
 		cnt = instCnt;
 		nodesUsed = 1;
 		leafs = 0;
 		//trianglesPerLeaf = 0;
 		depthMax = -1;
-		depthMin = 599;
+		depthMin = 2 * N;
 
 		for (INT m{}; m < instCnt; ++m) {
-			for (INT tr{}; tr < 12; ++tr) {
-				INT id{ 12 * m + tr };
+			for (INT tr{}; tr < LIMIT_I; ++tr) {
+				INT id{ LIMIT_I * m + tr };
 				XMINT4 trIds{ indices[tr] };
 
-				tri[id].v0 = Vector4::Transform(vertices[trIds.x], modelMatrices[m]);
-				tri[id].v1 = Vector4::Transform(vertices[trIds.y], modelMatrices[m]);
-				tri[id].v2 = Vector4::Transform(vertices[trIds.z], modelMatrices[m]);
+				tri[id].v0 = Vector4::Transform(vertices[trIds.x], modelMatrices);
+				tri[id].v1 = Vector4::Transform(vertices[trIds.y], modelMatrices);
+				tri[id].v2 = Vector4::Transform(vertices[trIds.z], modelMatrices);
 
 				tri[id].center = (tri[id].v0 + tri[id].v1 + tri[id].v2) / 3.f;
 
-				m_bvhCBuf.triIdx[id] = { id, 0, 0, 0 };
+				triIdx[id] = { id, 0, 0, 0 };
 			}
 		}
 	}
 
-	void update(INT instCnt, Vector4(&vertices)[24], XMINT4(&indices)[12], Matrix(&modelMatrices)[25]) {
+	void update(INT instCnt, Vector4(&vertices)[LIMIT_V], XMINT4(&indices)[LIMIT_I], Matrix modelMatrices) {
 		for (INT m{}; m < instCnt; ++m) {
-			for (INT tr{}; tr < 12; ++tr) {
-				INT id{ 12 * m + tr };
+			for (INT tr{}; tr < LIMIT_I; ++tr) {
+				INT id{ LIMIT_I * m + tr };
 				XMINT4 trIds{ indices[tr] };
 
-				tri[id].v0 = Vector4::Transform(vertices[trIds.x], modelMatrices[m]);
-				tri[id].v1 = Vector4::Transform(vertices[trIds.y], modelMatrices[m]);
-				tri[id].v2 = Vector4::Transform(vertices[trIds.z], modelMatrices[m]);
+				tri[id].v0 = Vector4::Transform(vertices[trIds.x], modelMatrices);
+				tri[id].v1 = Vector4::Transform(vertices[trIds.y], modelMatrices);
+				tri[id].v2 = Vector4::Transform(vertices[trIds.z], modelMatrices);
 				tri[id].center = (tri[id].v0 + tri[id].v1 + tri[id].v2) / 3.f;
 			}
 		}
 
 		for (int i{ nodesUsed - 1 }; 0 <= i; --i) {
-			BVHNode& node = m_bvhCBuf.bvhNode[i];
-			if (node.leftFirstCntParent.z != 0) {
+			//BVHNode& node = m_bvhCBuf.bvhNode[i];
+			AABB& aabb = bbs[i];
+			XMINT4& lfcp = lfcps[i];
+
+			if (lfcp.z != 0) {
 				updNodeBounds(i);
 				continue;
 			}
-			BVHNode& l = m_bvhCBuf.bvhNode[node.leftFirstCntParent.x];
-			BVHNode& r = m_bvhCBuf.bvhNode[node.leftFirstCntParent.x + 1];
-			node.bb.bmin = Vector4::Min(l.bb.bmin, r.bb.bmin);
-			node.bb.bmax = Vector4::Max(l.bb.bmax, r.bb.bmax);
+
+			AABB& l = bbs[lfcp.x];
+			AABB& r = bbs[lfcp.x + 1];
+			
+			aabb.bmin = Vector4::Min(l.bmin, r.bmin);
+			aabb.bmax = Vector4::Max(l.bmax, r.bmax);
 		}
 	}
 
 	void build() {
-		BVHNode& root = m_bvhCBuf.bvhNode[rootNodeIdx];
-		root.leftFirstCntParent = {
-			0, 0, 12 * cnt, -1
+		lfcps[0] = {
+			0, 0, LIMIT_I * cnt, -1
 		};
 		updNodeBounds(rootNodeIdx);
 		// subdivide recursively
@@ -116,15 +123,14 @@ public:
 
 private:
 	void updNodeBounds(INT nodeIdx) {
-		BVHNode& node = m_bvhCBuf.bvhNode[nodeIdx];
-		node.bb = {};
-		INT first{ node.leftFirstCntParent.y };
-		for (INT i{}; i < node.leftFirstCntParent.z; ++i) {
-			Tri& leafTri = tri[m_bvhCBuf.triIdx[first + i].x];
+		bbs[nodeIdx] = {};
+		INT first{ lfcps[nodeIdx].y };
+		for (INT i{}; i < lfcps[nodeIdx].z; ++i) {
+			Tri& leafTri = tri[triIdx[first + i].x];
 
-			node.bb.grow(leafTri.v0);
-			node.bb.grow(leafTri.v1);
-			node.bb.grow(leafTri.v2);
+			bbs[nodeIdx].grow(leafTri.v0);
+			bbs[nodeIdx].grow(leafTri.v1);
+			bbs[nodeIdx].grow(leafTri.v2);
 		}
 	}
 
@@ -141,7 +147,7 @@ private:
 	int depth(INT id) {
 		INT d{ 0 };
 		while (id != 0) {
-			id = m_bvhCBuf.bvhNode[id].leftFirstCntParent.w;
+			id = lfcps[id].w;
 			++d;
 		}
 		return d;
@@ -155,18 +161,18 @@ private:
 			depthMax = d;
 	}
 
-	void splitDichotomy(BVHNode& node, int& axis, float& splitPos) {
-		Vector4 e{ node.bb.extent()};
+	void splitDichotomy(INT nodeId, int& axis, float& splitPos) {
+		Vector4 e{ bbs[nodeId].extent()};
 		axis = static_cast<int>(e.x < e.y);
 		axis += static_cast<int>(vecCompByIdx(e, axis) < e.z);
-		splitPos = vecCompByIdx(node.bb.bmin + e / 2.f, axis);
+		splitPos = vecCompByIdx(bbs[nodeId].bmin + e / 2.f, axis);
 	}
 
-	float evaluateSAH(BVHNode& node, int axis, float pos) {
+	float evaluateSAH(INT nodeId, int axis, float pos) {
 		AABB leftBox{}, rightBox{};
 		int leftCnt{}, rightCnt{};
-		for (int i{}; i < node.leftFirstCntParent.z; ++i) {
-			Tri& t = tri[m_bvhCBuf.triIdx[node.leftFirstCntParent.y + i].x];
+		for (int i{}; i < lfcps[nodeId].z; ++i) {
+			Tri& t = tri[triIdx[lfcps[nodeId].y + i].x];
 
 			if (vecCompByIdx(t.center, axis) < pos) {
 				++leftCnt;
@@ -185,14 +191,14 @@ private:
 		return cost > 0 ? cost : std::numeric_limits<float>::max();
 	}
 
-	float splitSAH(BVHNode& node, int& axis, float& splitPos) {
+	float splitSAH(INT nodeId, int& axis, float& splitPos) {
 		float bestCost{ std::numeric_limits<float>::max() };
 		for (int a{}; a < 3; ++a) {
-			for (int i{}; i < node.leftFirstCntParent.z; ++i) {
-				Tri& t = tri[m_bvhCBuf.triIdx[node.leftFirstCntParent.y + i].x];
+			for (int i{}; i < lfcps[nodeId].z; ++i) {
+				Tri& t = tri[triIdx[lfcps[nodeId].y + i].x];
 				Vector4 center{ t.center };
 				float pos = vecCompByIdx(center, a);
-				float cost = evaluateSAH(node, a, pos);
+				float cost = evaluateSAH(nodeId, a, pos);
 				if (cost < bestCost) {
 					axis = a;
 					splitPos = pos;
@@ -204,24 +210,18 @@ private:
 		return bestCost;
 	}
 
-	float splitStepSAH(BVHNode& node, int& axis, float& pos) {
+	float splitStepSAH(INT nodeId, int& axis, float& pos) {
 		float bestCost{ std::numeric_limits<float>::max() };
 		for (int a{}; a < 3; ++a) {
-			float bmin{ vecCompByIdx(node.bb.bmin, a) };
-			float bmax{ vecCompByIdx(node.bb.bmax, a) };
-			/*for (int i{}; i < node.leftFirstCntParent.z; ++i) {
-				Tri& t = tri[m_bvhCBuf.triIdx[node.leftFirstCntParent.y + i].x];
-				bmin = min(bmin, vecCompByIdx(t.center, a));
-				bmax = max(bmax, vecCompByIdx(t.center, a));
-			}*/
-
+			float bmin{ vecCompByIdx(bbs[nodeId].bmin, a)};
+			float bmax{ vecCompByIdx(bbs[nodeId].bmax, a) };
 			if (bmin == bmax)
 				continue;
 
 			float step{ (bmax - bmin) / sahStep };
 			for (int i{ 1 }; i < sahStep; ++i) {
 				float candPos{ bmin + i * step };
-				float cost = evaluateSAH(node, a, candPos);
+				float cost = evaluateSAH(nodeId, a, candPos);
 				if (cost < bestCost) {
 					axis = a;
 					pos = candPos;
@@ -234,11 +234,11 @@ private:
 	}
 
 
-	float splitDynamicStepSAH(BVHNode& node, int& axis, float& splitPos) {
+	float splitDynamicStepSAH(INT nodeId, int& axis, float& splitPos) {
 		float bestCost{ std::numeric_limits<float>::max() };
 		for (int a{}; a < 3; ++a) {
-			float bmin{ vecCompByIdx(node.bb.bmin, a) };
-			float bmax{ vecCompByIdx(node.bb.bmax, a) };
+			float bmin{ vecCompByIdx(bbs[nodeId].bmin, a) };
+			float bmax{ vecCompByIdx(bbs[nodeId].bmax, a) };
 			if (bmin == bmax)
 				continue;
 
@@ -246,10 +246,10 @@ private:
 			int triCnt[MaxSteps]{};
 
 			float step = sahStep / (bmax - bmin);
-			for (int i{}; i < node.leftFirstCntParent.z; ++i) {
-				Tri& t = tri[m_bvhCBuf.triIdx[node.leftFirstCntParent.y + i].x];
-				int id{ min(
-					sahStep - 1, 
+			for (int i{}; i < lfcps[nodeId].z; ++i) {
+				Tri& t = tri[triIdx[lfcps[nodeId].y + i].x];
+				int id{ (std::min)(
+					sahStep - 1,
 					static_cast<int>((vecCompByIdx(t.center, a) - bmin) * step)
 				) };
 				++triCnt[id];
@@ -288,54 +288,48 @@ private:
 	}
 
 	void Subdivide(INT nodeId) {
-		// terminate recursion
-		BVHNode& node{ m_bvhCBuf.bvhNode[nodeId] };
-
 		// determine split axis and position
 		int axis{};
 		float splitPos{};
 
 		if (isSAH) {
 			float cost;
-
 			if (isStepSAH) {
-				cost = isBinsSAH ? splitDynamicStepSAH(node, axis, splitPos) : splitStepSAH(node, axis, splitPos);
+				cost = isBinsSAH ? splitDynamicStepSAH(nodeId, axis, splitPos) : splitStepSAH(nodeId, axis, splitPos);
 			}
 			else {
-				cost = splitSAH(node, axis, splitPos);
+				cost = splitSAH(nodeId, axis, splitPos);
 			}
 
-			//float cost = isStepSAH ? splitByStepSAH(node, axis, splitPos) : splitSAH(node, axis, splitPos);
-			
-			if (cost >= node.bb.area() * node.leftFirstCntParent.z) {
+			if (cost >= bbs[nodeId].area() * lfcps[nodeId].z) {
 				++leafs;
 				updDepths(nodeId);
 				return;
 			}
 		}
 		else {
-			if (node.leftFirstCntParent.z <= trianglesPerLeaf) {
+			if (lfcps[nodeId].z <= trianglesPerLeaf) {
 				++leafs;
 				updDepths(nodeId);
 				return;
 			}
-			splitDichotomy(node, axis, splitPos);
+			splitDichotomy(nodeId, axis, splitPos);
 		}
 
 		// in-place partition
-		INT i{ node.leftFirstCntParent.y };
-		INT j{ i + node.leftFirstCntParent.z - 1 };
+		INT i{ lfcps[nodeId].y };
+		INT j{ i + lfcps[nodeId].z - 1 };
 		while (i <= j) {
-			Tri& t = tri[m_bvhCBuf.triIdx[i++].x];
+			Tri& t = tri[triIdx[i++].x];
 			Vector4 center{ t.center };
 
 			if (splitPos <= vecCompByIdx(center, axis))
-				std::swap(m_bvhCBuf.triIdx[--i].x, m_bvhCBuf.triIdx[j--].x);
+				std::swap(triIdx[--i].x, triIdx[j--].x);
 		}
 
 		// abort split if one of the sides is empty
-		INT leftCnt{ i - node.leftFirstCntParent.y };
-		if (leftCnt == 0 || leftCnt == node.leftFirstCntParent.z) {
+		INT leftCnt{ i - lfcps[nodeId].y };
+		if (leftCnt == 0 || leftCnt == lfcps[nodeId].z) {
 			++leafs;
 			updDepths(nodeId);
 			return;
@@ -343,19 +337,19 @@ private:
 
 		// create child nodes
 		int leftIdx{ nodesUsed++ };
-		m_bvhCBuf.bvhNode[leftIdx].leftFirstCntParent = {
-			-1, node.leftFirstCntParent.y, leftCnt, nodeId
+		lfcps[leftIdx] = {
+			-1, lfcps[nodeId].y, leftCnt, nodeId
 		};
 		updNodeBounds(leftIdx);
 
 		int rightIdx{ nodesUsed++ };
-		m_bvhCBuf.bvhNode[rightIdx].leftFirstCntParent = {
-			-1, i, node.leftFirstCntParent.z - leftCnt, nodeId
+		lfcps[rightIdx] = {
+			-1, i, lfcps[nodeId].z - leftCnt, nodeId
 		};
 		updNodeBounds(rightIdx);
 
-		node.leftFirstCntParent = {
-			leftIdx, -1, 0, node.leftFirstCntParent.w
+		lfcps[nodeId] = {
+			leftIdx, -1, 0, lfcps[nodeId].w
 		};
 
 		// recurse

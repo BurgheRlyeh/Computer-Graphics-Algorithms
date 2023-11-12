@@ -1,7 +1,7 @@
 ﻿#include "Cube.h"
 
 #include "ShaderProcessor.h"
-#include "BVH.h"
+#include "CubeBVH.h"
 
 #include "../Common/imgui/imgui.h"
 #include "../Common/imgui/backends/imgui_impl_dx11.h"
@@ -147,7 +147,7 @@ HRESULT Cube::init(Matrix* positions, int num) {
 		hr = createModelBuffer();
 		THROW_IF_FAILED(hr);
 
-		hr = SetResourceName(m_pModelBufferInst, "ModelBufferInst");
+		hr = SetResourceName(m_pModelBuffer, "ModelBufferInst");
 		THROW_IF_FAILED(hr);
 	}
 
@@ -183,7 +183,7 @@ HRESULT Cube::init(Matrix* positions, int num) {
 	// create bvh buffer
 	{
 		D3D11_BUFFER_DESC desc{
-			.ByteWidth{ sizeof(BVH::BVHConstBuf) },
+			.ByteWidth{ sizeof(CubeBVH::BVHConstBuf) },
 			.Usage{ D3D11_USAGE_DEFAULT },
 			.BindFlags{ D3D11_BIND_CONSTANT_BUFFER }
 		};
@@ -348,14 +348,14 @@ HRESULT Cube::init(Matrix* positions, int num) {
 
 HRESULT Cube::createVertexBuffer(Vertex(&vertices)[], UINT numVertices) {
 	D3D11_BUFFER_DESC desc{
-		.ByteWidth{ sizeof(Vertex)* numVertices },
+		.ByteWidth{ sizeof(Vertex) * numVertices },
 		.Usage{ D3D11_USAGE_IMMUTABLE },
 		.BindFlags{ D3D11_BIND_VERTEX_BUFFER }
 	};
 
 	D3D11_SUBRESOURCE_DATA data{
 		.pSysMem{ vertices },
-		.SysMemPitch{ sizeof(Vertex)* numVertices }
+		.SysMemPitch{ sizeof(Vertex) * numVertices }
 	};
 
 	return m_pDevice->CreateBuffer(&desc, &data, &m_pVertexBuffer);
@@ -383,7 +383,7 @@ HRESULT Cube::createModelBuffer() {
 		.BindFlags{ D3D11_BIND_CONSTANT_BUFFER }
 	};
 
-	return m_pDevice->CreateBuffer(&desc, nullptr, &m_pModelBufferInst);
+	return m_pDevice->CreateBuffer(&desc, nullptr, &m_pModelBuffer);
 }
 
 HRESULT Cube::createTexture(TextureDesc& textureDesc, ID3D11Texture2D** texture) {
@@ -439,7 +439,7 @@ HRESULT Cube::createResourceView(TextureDesc& textureDesc, ID3D11Texture2D* pTex
 void Cube::term() {
 	SAFE_RELEASE(m_pVertexBuffer);
 	SAFE_RELEASE(m_pIndexBuffer);
-	SAFE_RELEASE(m_pModelBufferInst);
+	SAFE_RELEASE(m_pModelBuffer);
 	SAFE_RELEASE(m_pModelBufferInstVis);
 
 	SAFE_RELEASE(m_pVertexShader);
@@ -478,7 +478,7 @@ void Cube::update(float delta, bool isRotate) {
 		bvh_matrices[i] = m_modelBuffers[i].matrix;
 	}
 
-	m_pDeviceContext->UpdateSubresource(m_pModelBufferInst, 0, nullptr, m_modelBuffers.data(), 0, 0);
+	m_pDeviceContext->UpdateSubresource(m_pModelBuffer, 0, nullptr, m_modelBuffers.data(), 0, 0);
 	m_pDeviceContext->UpdateSubresource(m_pModelBufferInv, 0, nullptr, m_modelBuffersInv.data(), 0, 0);
 
 	updateBVH();
@@ -518,7 +518,7 @@ void Cube::render(ID3D11SamplerState* pSampler, ID3D11Buffer* pSceneBuffer) {
 	m_pDeviceContext->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	m_pDeviceContext->VSSetShader(m_pVertexShader, nullptr, 0);
 
-	ID3D11Buffer* cbuffers[]{ pSceneBuffer, m_pModelBufferInst, m_pModelBufferInstVis };
+	ID3D11Buffer* cbuffers[]{ pSceneBuffer, m_pModelBuffer, m_pModelBufferInstVis };
 	m_pDeviceContext->VSSetConstantBuffers(0, 3, cbuffers);
 	m_pDeviceContext->PSSetConstantBuffers(0, 3, cbuffers);
 
@@ -581,7 +581,7 @@ void Cube::rayTracing(ID3D11SamplerState* pSampler, ID3D11Buffer* m_pSBuf, ID3D1
 	m_pDeviceContext->CSSetShaderResources(0, 2, resources);
 
 	ID3D11Buffer* constBuffers[6]{
-		m_pSBuf, m_pModelBufferInst, m_pVIBuffer, m_pRTBuf, m_pModelBufferInv, m_pBVHBuffer
+		m_pSBuf, m_pModelBuffer, m_pVIBuffer, m_pRTBuf, m_pModelBufferInv, m_pBVHBuffer
 	};
 	m_pDeviceContext->CSSetConstantBuffers(0, 6, constBuffers);
 

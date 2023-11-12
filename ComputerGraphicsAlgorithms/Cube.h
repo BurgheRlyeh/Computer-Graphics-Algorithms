@@ -8,7 +8,7 @@
 #include "Camera.h"
 #include "AABB.h"
 #include "Timer.h"
-#include "BVH.h"
+#include "CubeBVH.h"
 
 struct TextureDesc;
 class Renderer;
@@ -16,21 +16,21 @@ struct Camera;
 struct AABB;
 class CPUTimer;
 class GPUTimer;
-class BVH;
+class CubeBVH;
 
 class Cube {
 public:
 	static const int MaxInstances{ 25 };
 
 public:
-	typedef struct TextureTangentVertex {
+	typedef struct Vertex {
 		DirectX::SimpleMath::Vector3 point{};
 		DirectX::SimpleMath::Vector3 tangent{};
 		DirectX::SimpleMath::Vector3 norm{};
 		DirectX::SimpleMath::Vector2 texture{};
 	} Vertex;
 
-	typedef struct ModelBuffer {
+	typedef struct ModelBuffer {	 
 		DirectX::SimpleMath::Matrix matrix{};
 		DirectX::SimpleMath::Matrix normalMatrix{};
 		// x - shininess
@@ -95,7 +95,7 @@ public:
 		};
 	} m_viBuffer{};
 
-	BVH bvh{};
+	CubeBVH bvh{};
 
 	struct CullParams {
 		DirectX::XMINT4 shapeCount{}; // x - shapes count
@@ -110,7 +110,7 @@ private:
 	ID3D11Buffer* m_pVertexBuffer{};
 	ID3D11Buffer* m_pIndexBuffer{};
 
-	ID3D11Buffer* m_pModelBufferInst{};
+	ID3D11Buffer* m_pModelBuffer{};
 	ID3D11Buffer* m_pModelBufferInstVis{};
 	std::vector<ModelBuffer> m_modelBuffers{ MaxInstances };
 	std::vector<AABB> m_modelBBs{ MaxInstances };
@@ -160,7 +160,7 @@ private:
 	bool m_updateCullParams{};
 	int m_gpuVisibleInstances{};
 
-	UINT m_instCount{ 2 };
+	UINT m_instCount{ 1 };
 	UINT m_instVisCount{ 0 };
 
 	bool m_doCull{ true };
