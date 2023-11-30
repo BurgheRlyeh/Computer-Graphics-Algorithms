@@ -19,8 +19,8 @@ ATOM                MyRegisterClass(HINSTANCE hInstance);
 BOOL                InitInstance(HINSTANCE, int);
 LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
 
-LONG                WindowWidth{ 640 };
-LONG                WindowHeight{ 360 };
+LONG                WindowWidth{ 1280 };
+LONG                WindowHeight{ 720 };
 
 Renderer* renderer{};
 

@@ -160,7 +160,7 @@ private:
 	bool m_updateCullParams{};
 	int m_gpuVisibleInstances{};
 
-	UINT m_instCount{ 1 };
+	UINT m_instCount{ 2 };
 	UINT m_instVisCount{ 0 };
 
 	bool m_doCull{ true };

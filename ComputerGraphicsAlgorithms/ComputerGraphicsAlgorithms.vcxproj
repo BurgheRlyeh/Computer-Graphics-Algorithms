@@ -149,14 +149,11 @@
     <ClInclude Include="..\Common\imgui\imstb_textedit.h" />
     <ClInclude Include="..\Common\imgui\imstb_truetype.h" />
     <ClInclude Include="AABB.h" />
-    <ClInclude Include="BVH.h" />
     <ClInclude Include="CubeBVH.h" />
     <ClInclude Include="Camera.h" />
     <ClInclude Include="ComputerGraphicsAlgorithms.h" />
     <ClInclude Include="Cube.h" />
     <ClInclude Include="framework.h" />
-    <ClInclude Include="Geometry.h" />
-    <ClInclude Include="CSVGeometryLoader.h" />
     <ClInclude Include="Light.h" />
     <ClInclude Include="LightSphere.h" />
     <ClInclude Include="PostProcess.h" />
@@ -181,7 +178,6 @@
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="ComputerGraphicsAlgorithms.cpp" />
     <ClCompile Include="Cube.cpp" />
-    <ClCompile Include="Geometry.cpp" />
     <ClCompile Include="LightSphere.cpp" />
     <ClCompile Include="PostProcess.cpp" />
     <ClCompile Include="Rect.cpp" />
@@ -205,7 +201,6 @@
     <None Include="FrustumCull.cs" />
     <None Include="packages.config" />
     <None Include="RayCasting.cs" />
-    <None Include="RayTracing.cs" />
     <None Include="Sepia.ps" />
     <None Include="Sepia.vs" />
     <None Include="SphereShader.ps" />
@@ -227,18 +222,6 @@
     <ProjectReference Include="..\DirectXTK\DirectXTK_Desktop_2022.vcxproj">
       <Project>{e0b52ae7-e160-4d32-bf3f-910b785e5a8e}</Project>
     </ProjectReference>
-  </ItemGroup>
-  <ItemGroup>
-    <FxCompile Include="RayCasting.hlsl">
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Compute</ShaderType>
-      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">5.0</ShaderModel>
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Compute</ShaderType>
-      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">5.0</ShaderModel>
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Compute</ShaderType>
-      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">5.0</ShaderModel>
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Compute</ShaderType>
-      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Release|x64'">5.0</ShaderModel>
-    </FxCompile>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

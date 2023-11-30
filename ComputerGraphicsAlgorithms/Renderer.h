@@ -18,8 +18,6 @@
 #include "PostProcess.h"
 #include "Timer.h"
 #include "CubeBVH.h"
-#include "Geometry.h"
-#include "BVH.h"
 
 #include "SimpleMath.h"
 
@@ -39,8 +37,6 @@ struct PostProcess;
 class CPUTimer;
 class GPUTimer;
 class CubeBVH;
-class Geometry;
-class BVH;
 
 class Renderer {
 	typedef struct SceneBuffer {
@@ -110,7 +106,6 @@ class Renderer {
 	PostProcess* m_pPostProcess{};
 
 	Cube* m_pCube{};
-	Geometry* m_pGeom{};
 	float m_cubeAngleRotation{};
 
 	Sphere* m_pSphere{};
@@ -136,7 +131,7 @@ class Renderer {
 	UINT m_width{ 16 };
 	UINT m_height{ 16 };
 
-	bool m_isModelRotate{ false };
+	bool m_isModelRotate{ true };
 
 	size_t m_prevTime{};
 
